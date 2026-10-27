@@ -1574,3 +1574,180 @@ summary {
 .effect-field + .effect-field {
   margin-top: 22px;
 }
+
+/* Shared competition and projection views. Offline game styles stay independent. */
+.online-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-top: 32px;
+  align-items: start;
+}
+.online-game,
+.online-leaderboard {
+  padding: clamp(18px, 3vw, 40px);
+  min-width: 0;
+}
+.online-game h1,
+.online-leaderboard h1 {
+  font-size: clamp(25px, 3vw, 42px);
+}
+.online-game p,
+.online-leaderboard p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.online-game a,
+.join-address a {
+  color: var(--accent, #b9edb4);
+  overflow-wrap: anywhere;
+}
+.online-game form {
+  display: grid;
+  gap: 14px;
+  margin: 24px 0;
+}
+.online-game label {
+  display: grid;
+  gap: 8px;
+}
+.online-game input {
+  width: 100%;
+  min-width: 0;
+}
+.online-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0;
+  overflow-wrap: anywhere;
+}
+.online-board-lock {
+  border: 0;
+  padding: 0;
+  margin: 20px 0;
+  min-width: 0;
+}
+.online-board-lock:disabled {
+  opacity: 0.7;
+}
+.online-status {
+  font-size: 18px !important;
+}
+.online-score-list {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+}
+.online-score-list li {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: 1px solid #ffffff20;
+}
+.online-score-list strong {
+  overflow-wrap: anywhere;
+}
+.online-score-list li > span {
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+}
+.online-score-list small {
+  font-size: 14px;
+  display: inline;
+}
+.online-rank {
+  color: #bee6b2;
+}
+.online-score-list li:first-child {
+  color: #ffdc8c;
+}
+.projection {
+  margin: 24px auto;
+  max-width: 1500px;
+}
+.projection h1 {
+  font-size: clamp(32px, 4.5vw, 72px);
+}
+.projection .online-score-list li {
+  font-size: clamp(24px, 3vw, 48px);
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  padding: 24px 12px;
+}
+.projection .online-score-list li > span {
+  font-size: clamp(28px, 3.5vw, 56px);
+}
+.join-address {
+  font-size: clamp(16px, 2vw, 28px);
+  margin-top: 32px;
+}
+@media (max-width: 800px) {
+  .online-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .site-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .site-header nav {
+    flex-wrap: wrap;
+  }
+  .projection .online-score-list li {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+}
+.projection-mode .site-header {
+  height: 64px;
+  max-width: 1600px;
+}
+.projection-mode main {
+  max-width: 1600px;
+  padding: 20px 24px;
+}
+.projection-mode footer {
+  display: none;
+}
+.projection-mode .projection {
+  margin: 0;
+  padding: 24px 32px;
+}
+.projection-mode h1 {
+  font-size: clamp(32px, 3.5vw, 64px);
+  margin: 12px 0;
+}
+.projection-mode .projection p {
+  margin: 8px 0;
+}
+.projection-mode .online-toolbar {
+  margin: 12px 0;
+}
+.projection-mode .online-score-list {
+  margin: 16px 0;
+}
+.projection-mode .online-score-list li {
+  padding: 16px 12px;
+  font-size: clamp(24px, 2.5vw, 44px);
+  line-height: 1.2;
+}
+.projection-mode .online-score-list li > span {
+  font-size: clamp(28px, 3vw, 48px);
+  line-height: 1.2;
+}
+.projection-mode .join-address {
+  margin-top: 20px;
+  font-size: clamp(16px, 1.6vw, 26px);
+}
+@media (max-width: 800px) {
+  .projection-mode .site-header {
+    height: auto;
+    min-height: 98px;
+  }
+  .projection-mode .projection {
+    padding: 18px;
+  }
+}

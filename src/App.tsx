@@ -26,14 +26,23 @@ import { Board } from './components/Board';
 import { Explosion } from './components/Explosion';
 import { AdminPanel } from './components/AdminPanel';
 import { Leaderboard } from './components/Leaderboard';
+import { OnlineCompetition } from './components/OnlineCompetition';
+import { OnlineLeaderboard } from './components/OnlineLeaderboard';
 
-type View = 'menu' | 'game' | 'scores' | 'admin';
+type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'display';
+const hashView = (): View =>
+  location.hash === '#display' ? 'display' : location.hash === '#online' ? 'online' : 'menu';
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [scores, setScores] = useState(loadScores);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const urlRef = useRef<Record<string, string>>({});
-  const [view, setView] = useState<View>('menu');
+  const [view, setView] = useState<View>(hashView);
+  useEffect(() => {
+    const onHash = () => navigate(hashView());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  });
   const [difficulty, setDifficulty] = useState('normal');
   const [custom, setCustom] = useState<BoardConfig>({ rows: 8, cols: 8, mines: 10 });
   const [name, setName] = useState('');
@@ -214,13 +223,22 @@ export default function App() {
   }
   function navigate(next: View) {
     if (gameRef.current.status === 'playing' && view === 'game') {
-      if (!confirm('离开将结束当前对局，且不会记录这局成绩。确定离开？')) return;
+      if (!confirm('离开将结束当前对局，且不会记录这局成绩。确定离开？')) {
+        history.replaceState(null, '', `${location.pathname}${location.search}`);
+        return;
+      }
       const reset = createGame(game.config);
       gameRef.current = reset;
       setGame(reset);
       started.current = null;
       setElapsed(0);
     }
+    // Hash routes work on GitHub Pages without server rewrites.
+    history.replaceState(
+      null,
+      '',
+      `${location.pathname}${location.search}${next === 'online' || next === 'display' ? `#${next}` : ''}`,
+    );
     setView(next);
   }
   async function fullscreen() {
@@ -244,7 +262,7 @@ export default function App() {
   }[game.status];
   return (
     <div
-      className={`app ${settings.effects.reduced ? 'reduce-motion' : ''} ${explosion !== null ? 'is-exploding' : ''}`}
+      className={`app ${view === 'display' ? 'projection-mode' : ''} ${settings.effects.reduced ? 'reduce-motion' : ''} ${explosion !== null ? 'is-exploding' : ''}`}
       style={{ '--screen-shake': `${settings.effects.shake}px` } as CSSProperties}
     >
       <div className="background-asset">
@@ -273,6 +291,12 @@ export default function App() {
             onClick={() => navigate('scores')}
           >
             排行榜
+          </button>
+          <button
+            aria-current={view === 'online' ? 'page' : undefined}
+            onClick={() => navigate('online')}
+          >
+            在线比赛
           </button>
           <button
             className="icon-button"
@@ -555,6 +579,15 @@ export default function App() {
             onClose={() => setView('menu')}
           />
         )}
+        {view === 'online' && (
+          <OnlineCompetition
+            settings={settings}
+            urls={urls}
+            sound={sound}
+            onExplosion={() => setExplosion(++explosionCounter.current)}
+          />
+        )}
+        {view === 'display' && <OnlineLeaderboard display />}
         {view === 'admin' &&
           (assetsReady ? (
             <AdminPanel
