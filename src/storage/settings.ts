@@ -31,8 +31,8 @@ export interface Effects {
 export const EFFECT_PRESETS: Record<string, Effects> = {
   classic: {
     preset: 'classic',
-    duration: 1800,
-    count: 32,
+    duration: 1600,
+    count: 42,
     speed: 1,
     color: '#f5bd73',
     scale: 1,
@@ -41,8 +41,8 @@ export const EFFECT_PRESETS: Record<string, Effects> = {
   },
   rain: {
     preset: 'rain',
-    duration: 2400,
-    count: 48,
+    duration: 2200,
+    count: 40,
     speed: 1.2,
     color: '#88dfd1',
     scale: 0.85,
@@ -51,12 +51,12 @@ export const EFFECT_PRESETS: Record<string, Effects> = {
   },
   super: {
     preset: 'super',
-    duration: 2600,
-    count: 64,
+    duration: 2100,
+    count: 72,
     speed: 1.5,
     color: '#ffd780',
     scale: 1.4,
-    shake: 9,
+    shake: 6,
     reduced: false,
   },
   minimal: {

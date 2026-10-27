@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { DEFAULT_MASCOT } from './storage/defaultAssets';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   createGame,
   expire,
@@ -242,7 +243,10 @@ export default function App() {
     timeout: '挑战时间已结束',
   }[game.status];
   return (
-    <div className={`app ${settings.effects.reduced ? 'reduce-motion' : ''}`}>
+    <div
+      className={`app ${settings.effects.reduced ? 'reduce-motion' : ''} ${explosion !== null ? 'is-exploding' : ''}`}
+      style={{ '--screen-shake': `${settings.effects.shake}px` } as CSSProperties}
+    >
       <div className="background-asset">
         <AssetImage asset="background" urls={urls} settings={settings} />
       </div>
@@ -331,7 +335,7 @@ export default function App() {
                       asset="decoration"
                       urls={urls}
                       settings={settings}
-                      fallback={urls.mine || './potato.svg'}
+                      fallback={urls.mine || DEFAULT_MASCOT}
                     />
                     <span className="orbit orbit-one" />
                     <span className="orbit orbit-two" />
@@ -510,7 +514,7 @@ export default function App() {
                             asset={game.status === 'won' ? 'victory' : 'defeat'}
                             urls={urls}
                             settings={settings}
-                            fallback="./potato.svg"
+                            fallback={DEFAULT_MASCOT}
                           />
                         </div>
                         <span className="eyebrow">

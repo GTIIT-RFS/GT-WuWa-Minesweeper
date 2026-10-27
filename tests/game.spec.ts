@@ -70,7 +70,7 @@ test('upload immediately, persist image and effects, preview, restore', async ({
   await page.getByRole('tab', { name: '素材管理' }).click();
   await expect(card.locator('img')).toHaveAttribute('src', /^blob:/);
   await card.getByRole('button', { name: '恢复默认' }).click();
-  await expect(card.locator('img')).toHaveAttribute('src', './potato.svg');
+  await expect(card.locator('img')).toHaveAttribute('src', './mascot.png');
 });
 test('invalid upload and custom board handled; responsive layout', async ({ page }) => {
   await page.getByRole('button', { name: /自定义模式/ }).click();

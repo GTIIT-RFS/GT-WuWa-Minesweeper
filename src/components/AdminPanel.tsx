@@ -1,3 +1,4 @@
+import { DEFAULT_MASCOT } from '../storage/defaultAssets';
 import { useState, type ChangeEvent } from 'react';
 import {
   ASSET_LABELS,
@@ -173,7 +174,7 @@ export function AdminPanel({
                       asset={key}
                       settings={settings}
                       urls={urls}
-                      fallback={['mine', 'explosion'].includes(key) ? './potato.svg' : undefined}
+                      fallback={['mine', 'explosion'].includes(key) ? DEFAULT_MASCOT : undefined}
                     />
                     {!urls[key] && !['mine', 'explosion'].includes(key) && <span>默认界面</span>}
                   </div>
@@ -264,26 +265,101 @@ export function AdminPanel({
           <div className="settings-grid">
             <div className="setting-card">
               <h3>爆炸参数</h3>
+              <p className="muted">
+                滑动或直接输入数值。推荐 1.2–2.4 秒；手机建议不超过 48
+                个粒子。参数保存后用于下一次爆炸。
+              </p>
               {(
                 [
-                  { key: 'duration', label: '持续时间（毫秒）', min: 500, max: 4000, step: 100 },
-                  { key: 'count', label: '粒子数量', min: 0, max: 80, step: 1 },
-                  { key: 'speed', label: '粒子速度', min: 0, max: 2, step: 0.1 },
-                  { key: 'scale', label: '土豆放大倍率', min: 0.5, max: 1.5, step: 0.1 },
-                  { key: 'shake', label: '震动强度', min: 0, max: 10, step: 1 },
+                  {
+                    key: 'duration',
+                    label: '动画总时长',
+                    unit: 'ms',
+                    hint: '包含预警、爆炸和收尾，结束即显示结算。',
+                    min: 500,
+                    max: 4000,
+                    step: 100,
+                  },
+                  {
+                    key: 'count',
+                    label: '粒子数量',
+                    unit: '个',
+                    hint: '越多越密集；土豆雨会将粒子替换为小土豆。',
+                    min: 0,
+                    max: 80,
+                    step: 1,
+                  },
+                  {
+                    key: 'speed',
+                    label: '扩散距离 / 速度',
+                    unit: '×',
+                    hint: '控制粒子飞散范围，不增加动画时长。',
+                    min: 0,
+                    max: 2,
+                    step: 0.1,
+                  },
+                  {
+                    key: 'scale',
+                    label: '主图大小',
+                    unit: '×',
+                    hint: '先迅速放大，再轻弹回落；最大值会更有冲击力。',
+                    min: 0.5,
+                    max: 1.5,
+                    step: 0.1,
+                  },
+                  {
+                    key: 'shake',
+                    label: '屏幕轻震',
+                    unit: 'px',
+                    hint: '0 表示关闭。建议 2–6，震动仅持续 0.36 秒。',
+                    min: 0,
+                    max: 10,
+                    step: 1,
+                  },
                 ] as const
               ).map((item) => (
-                <label key={item.key}>
-                  {item.label} · {settings.effects[item.key]}
-                  <input
-                    type="range"
-                    min={item.min}
-                    max={item.max}
-                    step={item.step}
-                    value={settings.effects[item.key]}
-                    onChange={(e) => effect({ [item.key]: +e.target.value })}
-                  />
-                </label>
+                <div className="effect-field" key={item.key}>
+                  <label htmlFor={`effect-${item.key}`}>
+                    {item.label}
+                    <output className="effect-value">
+                      {settings.effects[item.key]} {item.unit}
+                    </output>
+                  </label>
+                  <div className="effect-controls">
+                    <input
+                      id={`effect-${item.key}`}
+                      aria-describedby={`hint-${item.key}`}
+                      type="range"
+                      min={item.min}
+                      max={item.max}
+                      step={item.step}
+                      value={settings.effects[item.key]}
+                      onChange={(e) => effect({ [item.key]: +e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      aria-label={`${item.label}数值`}
+                      min={item.min}
+                      max={item.max}
+                      step={item.step}
+                      value={settings.effects[item.key]}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        if (
+                          event.target.value !== '' &&
+                          Number.isFinite(value) &&
+                          value >= item.min &&
+                          value <= item.max &&
+                          (item.step !== 1 || Number.isInteger(value))
+                        )
+                          effect({ [item.key]: value });
+                      }}
+                    />
+                  </div>
+                  <small className="effect-hint" id={`hint-${item.key}`}>
+                    {item.hint}
+                  </small>
+                </div>
               ))}
               <label>
                 粒子颜色
@@ -295,7 +371,13 @@ export function AdminPanel({
               </label>
             </div>
             <div className="setting-card">
-              <h3>动态效果</h3>
+              <h3>预览与舒适度</h3>
+              <p className="effect-summary">
+                当前总时长 {(settings.effects.duration / 1000).toFixed(1)} 秒 ·{' '}
+                {settings.effects.count} 个粒子
+                <br />
+                预设会立即预览；再次测试可从头播放。
+              </p>
               <label className="check">
                 <input
                   type="checkbox"

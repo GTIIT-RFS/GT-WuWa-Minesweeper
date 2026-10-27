@@ -1,3 +1,4 @@
+import { DEFAULT_MASCOT } from '../storage/defaultAssets';
 import type { CSSProperties } from 'react';
 import type { Game } from '../game/engine';
 import type { Settings } from '../storage/settings';
@@ -60,7 +61,7 @@ export function Board({
                       asset="mine"
                       urls={urls}
                       settings={settings}
-                      fallback="./potato.svg"
+                      fallback={DEFAULT_MASCOT}
                     />
                   ) : (
                     cell.adjacent || ''
