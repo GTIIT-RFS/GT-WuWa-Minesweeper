@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.env*
+!.env.example
+release/
+tools/windows-launcher/web/
