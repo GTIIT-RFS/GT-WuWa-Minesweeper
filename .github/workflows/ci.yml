@@ -10,10 +10,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Temporary formatter diff
-        run: |
-          npx prettier --write src/components/Board.tsx src/components/OnlineCompetition.tsx src/styles.css
-          git --no-pager diff -- src/components/Board.tsx src/components/OnlineCompetition.tsx src/styles.css
       - run: npm run format:check
       - run: npm test
       - run: npm run build
