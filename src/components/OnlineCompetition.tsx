@@ -300,7 +300,7 @@ export function OnlineCompetition({
           </div>
         )}
       </section>
-      <OnlineLeaderboard onOverview={setOverview} />
+      <OnlineLeaderboard onOverview={setOverview} testMode={testMode} />
     </div>
   );
 }
