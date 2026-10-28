@@ -58,7 +58,8 @@ export function createCompetitionHandler(
         throw new ApiError(400, '无效请求。');
       const input = body as Record<string, unknown>;
       const token = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i)?.[1];
-      const identity = token ? await authenticate(token) : null;
+      const identity =
+        token && !token.startsWith('sb_publishable_') ? await authenticate(token) : null;
       const player = identity?.id ?? null;
       const page = input.page === undefined ? 0 : input.page;
       if (!Number.isInteger(page) || (page as number) < 0 || (page as number) > 10000)

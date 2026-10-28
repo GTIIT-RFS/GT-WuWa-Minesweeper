@@ -28,10 +28,14 @@ import { AdminPanel } from './components/AdminPanel';
 import { Leaderboard } from './components/Leaderboard';
 import { OnlineCompetition } from './components/OnlineCompetition';
 import { OnlineLeaderboard } from './components/OnlineLeaderboard';
+import { AwardWallet } from './components/AwardWallet';
+import { EventAdmin } from './components/EventAdmin';
 
-type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'display';
+type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'display' | 'awards' | 'event-admin';
 const hashView = (): View =>
-  location.hash === '#display' ? 'display' : location.hash === '#online' ? 'online' : 'menu';
+  ['online', 'display', 'awards', 'event-admin'].includes(location.hash.slice(1).split('?')[0])
+    ? (location.hash.slice(1).split('?')[0] as View)
+    : 'menu';
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [scores, setScores] = useState(loadScores);
@@ -234,11 +238,14 @@ export default function App() {
       setElapsed(0);
     }
     // Hash routes work on GitHub Pages without server rewrites.
-    history.replaceState(
-      null,
-      '',
-      `${location.pathname}${location.search}${next === 'online' || next === 'display' ? `#${next}` : ''}`,
-    );
+    // Keep a private claim fragment until EventAdmin reads and removes it on mount.
+    const fragment =
+      next === 'event-admin' && location.hash.startsWith('#event-admin?')
+        ? location.hash
+        : ['online', 'display', 'awards', 'event-admin'].includes(next)
+          ? `#${next}`
+          : '';
+    history.replaceState(null, '', `${location.pathname}${location.search}${fragment}`);
     setView(next);
   }
   async function fullscreen() {
@@ -588,6 +595,8 @@ export default function App() {
           />
         )}
         {view === 'display' && <OnlineLeaderboard display />}
+        {view === 'awards' && <AwardWallet />}
+        {view === 'event-admin' && <EventAdmin />}
         {view === 'admin' &&
           (assetsReady ? (
             <AdminPanel
@@ -609,6 +618,7 @@ export default function App() {
         </span>
         <span>
           本机独立保存 <button onClick={() => navigate('admin')}>⚙ 管理员设置</button>
+          <button onClick={() => navigate('event-admin')}>赛事后台</button>
         </span>
       </footer>
       {explosion !== null && (

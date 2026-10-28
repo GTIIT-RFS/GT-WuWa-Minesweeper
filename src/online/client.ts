@@ -61,6 +61,14 @@ export type OnlineRequest =
 export async function competitionRequest(body: OnlineRequest): Promise<PublicRound> {
   return eventRequest<PublicRound>(body);
 }
+export class RequestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
 export async function eventRequest<T>(body: object, staff = false): Promise<T> {
   const client = staff ? staffSupabase : supabase;
   if (!client) throw new Error('在线比赛尚未配置。');
@@ -71,7 +79,7 @@ export async function eventRequest<T>(body: object, staff = false): Promise<T> {
       const result = await error.context.json().catch(() => null);
       if (result?.error) message = result.error;
     }
-    throw new Error(message);
+    throw new RequestError(message, error.context instanceof Response ? error.context.status : 0);
   }
   return data as T;
 }

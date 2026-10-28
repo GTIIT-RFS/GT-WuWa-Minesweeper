@@ -63,7 +63,7 @@ export function OnlineLeaderboard({
     let timer: number;
     async function poll() {
       await refresh();
-      if (!stopped) timer = window.setTimeout(() => void poll(), 5000);
+      if (!stopped) timer = window.setTimeout(() => void poll(), display ? 5000 : 10000);
     }
     void poll();
     const update = () => {
@@ -99,13 +99,13 @@ export function OnlineLeaderboard({
   }, [display, joinUrl]);
   const selected = historyStage || data?.stages.filter((s) => s.settled_at).at(-1)?.id || '';
   const kind = mode === 'live' && data?.state === 'ended' ? 'evening' : mode;
-  const historyKey = `${selected}:${historyPage}`;
+  const historyKey = `${kind}:${selected}:${historyPage}`;
   useEffect(() => {
-    if (kind !== 'history' || !selected) return;
+    if ((kind !== 'history' || !selected) && !(kind === 'evening' && historyPage > 0)) return;
     let stopped = false;
-    void readBoard('history', selected, historyPage)
+    void readBoard(kind, kind === 'history' ? selected : null, historyPage)
       .then((board) => {
-        if (!stopped) setHistory({ key: `${selected}:${historyPage}`, board });
+        if (!stopped) setHistory({ key: `${kind}:${selected}:${historyPage}`, board });
       })
       .catch((e) => {
         if (!stopped) setError(e.message);
@@ -115,7 +115,7 @@ export function OnlineLeaderboard({
     };
   }, [kind, selected, historyPage, data?.serverNow]);
   const board =
-    kind === 'history'
+    kind === 'history' || (kind === 'evening' && historyPage > 0)
       ? history?.key === historyKey
         ? history.board
         : empty
@@ -185,6 +185,7 @@ export function OnlineLeaderboard({
                   onClick={() => {
                     setMode(m);
                     setPage(0);
+                    setHistoryPage(0);
                   }}
                 >
                   {['本轮实时榜', '历史获奖榜', '整晚总榜'][i]}
@@ -261,7 +262,7 @@ export function OnlineLeaderboard({
               )}
             </ol>
           )}
-          {kind === 'history' && board.total > 100 && (
+          {kind !== 'live' && board.total > 100 && (
             <div className="online-toolbar">
               <button disabled={!historyPage} onClick={() => setHistoryPage((p) => p - 1)}>
                 上一页排名
@@ -291,7 +292,7 @@ export function OnlineLeaderboard({
             </div>
           )}
           <small className="muted">
-            服务器校时 · 每 5 秒刷新 ·{' '}
+            服务器校时 · 每 {display ? 5 : 10} 秒刷新 ·{' '}
             {data ? `北京时间 ${beijing(data.serverNow, true)}` : '连接中'}
           </small>
         </>

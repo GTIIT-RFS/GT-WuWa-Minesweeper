@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { PublicRound, Move } from '../../supabase/functions/_shared/competition';
-import { competitionRequest, supabase, type OnlineRequest } from '../online/client';
+import { competitionRequest, RequestError, supabase, type OnlineRequest } from '../online/client';
 import type { Settings } from '../storage/settings';
 import type { SoundKey } from '../storage/assets';
 import { Board } from './Board';
@@ -32,6 +32,7 @@ export function OnlineCompetition({
   const busy = useRef(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const [identityInvalid, setIdentityInvalid] = useState(false);
   const [flagMode, setFlagMode] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const receivedAt = useRef(performance.now());
@@ -50,14 +51,24 @@ export function OnlineCompetition({
   }, []);
   async function send(body: OnlineRequest) {
     if (busy.current) return;
+    if (body.action === 'start') {
+      try {
+        displayName(body.name);
+      } catch (e) {
+        setError((e as Error).message);
+        return;
+      }
+    }
     busy.current = true;
     setWorking(true);
     setError('');
     setPending(body);
     try {
       if (body.action === 'start') {
-        displayName(body.name);
-        const restored = await ensureAnonymousSession(captchaToken || undefined);
+        const restored = await ensureAnonymousSession(captchaToken || undefined).catch((e) => {
+          setPending(null);
+          throw e;
+        });
         setSession(restored);
       }
       const next = await competitionRequest(body);
@@ -77,6 +88,7 @@ export function OnlineCompetition({
         sound(body.move.kind === 'flag' ? 'flag' : 'reveal');
     } catch (e) {
       setError((e as Error).message);
+      if (e instanceof RequestError && e.status === 401) setIdentityInvalid(true);
       setCaptchaToken('');
       setCaptchaReset((x) => x + 1);
     } finally {
@@ -223,6 +235,30 @@ export function OnlineCompetition({
           </>
         )}
         {error && <p role="alert">{error}</p>}
+        {identityInvalid && (
+          <button
+            disabled={working}
+            onClick={() =>
+              void (async () => {
+                if (
+                  !supabase ||
+                  !confirm(
+                    '先尝试刷新会话；若无法恢复，清理失效会话可能导致旧匿名身份及领奖资格无法找回。是否继续？',
+                  )
+                )
+                  return;
+                const { error } = await supabase.auth.refreshSession();
+                if (error) await supabase.auth.signOut({ scope: 'local' });
+                setIdentityInvalid(false);
+                setPending(null);
+                setRound(null);
+                setError('已重新检查会话。若身份已丢失，请联系工作人员处理旧领奖记录。');
+              })()
+            }
+          >
+            修复失效匿名会话
+          </button>
+        )}
         {pending && !working && (
           <div className="online-toolbar">
             <button className="primary" onClick={() => void send(pending)}>

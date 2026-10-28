@@ -2,6 +2,31 @@ import { useEffect, useState } from 'react';
 import { readAwards, supabase } from '../online/client';
 import type { Award } from '../../supabase/functions/_shared/event-types';
 import { awardLabels } from '../online/presentation';
+import QRCode from 'qrcode';
+function PrivateClaimQr({ award }: { award: Award }) {
+  const [image, setImage] = useState('');
+  const url = `${location.origin}${location.pathname}#event-admin?award=${encodeURIComponent(award.id)}&credential=${encodeURIComponent(award.token!)}`;
+  useEffect(() => {
+    let stopped = false;
+    void QRCode.toDataURL(url, { width: 220, margin: 2 })
+      .then((value) => {
+        if (!stopped) setImage(value);
+      })
+      .catch(() => {});
+    return () => {
+      stopped = true;
+    };
+  }, [url]);
+  return image ? (
+    <img
+      className="private-claim-qr"
+      src={image}
+      alt="仅供工作人员扫描的私人领奖二维码"
+      width="220"
+      height="220"
+    />
+  ) : null;
+}
 export function AwardWallet() {
   const [awards, setAwards] = useState<Award[]>([]);
   const [error, setError] = useState('');
@@ -54,6 +79,10 @@ export function AwardWallet() {
             <>
               <p>现场核验凭证（仅向工作人员出示）</p>
               <code className="claim-token">{a.token}</code>
+              <PrivateClaimQr award={a} />
+              <p className="muted">
+                工作人员可用手机扫描此私人二维码进入核验后台。请勿分享或公开投影。
+              </p>
             </>
           )}
         </article>

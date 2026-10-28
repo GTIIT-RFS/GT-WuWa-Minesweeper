@@ -228,7 +228,7 @@ begin
     when t<(select min(starts_at) from public.event_stages where competition_id=e.id) then 'upcoming' else 'ended' end;
   select coalesce(jsonb_agg(to_jsonb(a)||jsonb_build_object('rank',r.rank,'display_name',r.display_name,'elapsed_ms',r.elapsed_ms,'round_no',x.round_no) order by x.round_no,a.prize_slot,a.created_at),'[]') into awards
     from public.event_awards a join public.event_rankings r using(stage_id,player_id) join public.event_stages x on x.id=a.stage_id;
-  return jsonb_build_object('serverNow',t,'event',to_jsonb(e),'state',state,'stages',stages,'currentStage',to_jsonb(s),
+  return jsonb_build_object('serverNow',t,'event',to_jsonb(e),'state',state,'stages',stages,'currentStage',case when s.id is null then null else to_jsonb(s) end,
     'live',public.event_board('live',s.id,p_player,0),'evening',public.event_board('evening',null,p_player,0),'awards',awards);
 end;
 $$;
@@ -247,9 +247,10 @@ create function public.event_admin_action(p_actor uuid,p_request uuid,p_action t
 declare e public.online_competitions; s public.event_stages; a public.event_awards; previous public.event_audit;
   t timestamptz; d date; start_time timestamptz; end_time timestamptz; i integer; count_prizes integer;
   before_state jsonb; after_state jsonb; result jsonb:='{}'; stage uuid; candidate public.event_rankings; target_status text;
-  digest text; person text; reason text; accepted integer;
+  digest text; person text; reason text; accepted integer; successor uuid;
 begin
   perform public.event_require_admin(p_actor);
+  if p_request is null then raise exception 'request id required'; end if;
   select * into e from public.online_competitions where id='club-night-v1' for update;
   t:=public.event_clock();
   digest:=encode(sha256(convert_to(p_action||coalesce(p_payload::text,''),'UTF8')),'hex');
@@ -272,7 +273,7 @@ begin
     end loop;
     after_state:=jsonb_build_object('eventDate',d,'defaultSchedule',true);
   elsif p_action='pause' then
-    before_state:=to_jsonb(e); update public.online_competitions set paused=(p_payload->>'paused')::boolean where id=e.id returning to_jsonb(online_competitions.*) into after_state;
+    before_state:=to_jsonb(e); update public.online_competitions set paused=(p_payload->>'paused')::boolean,enabled=true where id=e.id returning to_jsonb(online_competitions.*) into after_state;
   elsif p_action in('schedule','prizes') then
     stage:=(p_payload->>'stageId')::uuid; select * into s from public.event_stages where id=stage and competition_id=e.id;
     if not found or s.settled_at is not null or s.ends_at<=t then raise exception 'stage frozen or missing'; end if;
@@ -281,7 +282,7 @@ begin
       if s.starts_at<=t or reason is null or length(reason)<2 then raise exception 'only future schedule with reason'; end if;
       start_time:=(p_payload->>'startsAt')::timestamptz; end_time:=(p_payload->>'endsAt')::timestamptz;
       if start_time is null or end_time is null or start_time<=t or end_time<>start_time+interval '1 hour' or
-        exists(select 1 from public.event_stages where id<>stage and competition_id=e.id and starts_at<end_time and ends_at>start_time) or
+        exists(select 1 from public.event_stages where id<>stage and competition_id=e.id and (starts_at<end_time and ends_at>start_time or round_no<s.round_no and ends_at>start_time or round_no>s.round_no and starts_at<end_time)) or
         (start_time at time zone 'Asia/Shanghai')::date<>e.event_date then raise exception 'invalid schedule'; end if;
       update public.event_stages set starts_at=start_time,ends_at=end_time where id=stage;
     else
@@ -307,7 +308,7 @@ begin
       update public.event_awards set status='claimed',claimed_at=t where id=a.id;
     elsif p_action='status' then
       target_status:=p_payload->>'status';
-      if reason is null or length(reason)<2 or target_status not in('unclaimed','waived','disqualified') then raise exception 'reason and valid status required'; end if;
+      if reason is null or length(reason)<2 or target_status is null or target_status not in('unclaimed','waived','disqualified') then raise exception 'reason and valid status required'; end if;
       if a.status='claimed' and target_status<>'disqualified' then raise exception 'claimed award cannot reopen'; end if;
       if a.status in('waived','disqualified') then raise exception 'award frozen'; end if;
       update public.event_awards set status=target_status where id=a.id;
@@ -320,11 +321,14 @@ begin
         and not exists(select 1 from public.event_claims c where c.competition_id=e.id and c.player_id=r.player_id)
         order by r.rank limit 1;
       if not found then raise exception 'no eligible successor'; end if;
-      insert into public.event_awards(stage_id,player_id,prize_slot,predecessor_id,created_at) values(stage,candidate.player_id,a.prize_slot,a.id,t) returning id into candidate.player_id;
-      insert into public.event_credentials(award_id) values(candidate.player_id);
-      result:=jsonb_build_object('successorAwardId',candidate.player_id);
+      insert into public.event_awards(stage_id,player_id,prize_slot,predecessor_id,created_at) values(stage,candidate.player_id,a.prize_slot,a.id,t) returning id into successor;
+      insert into public.event_credentials(award_id) values(successor);
+      result:=jsonb_build_object('successorAwardId',successor);
     end if;
     select to_jsonb(x) into after_state from public.event_awards x where id=a.id;
+    if p_action='rollover' then
+      after_state:=jsonb_build_object('originalAward',after_state,'successor',(select to_jsonb(x) from public.event_awards x where id=successor));
+    end if;
   else raise exception 'unknown admin action'; end if;
   result:=result||jsonb_build_object('ok',true);
   insert into public.event_audit(actor_id,request_id,operation_hash,action,stage_id,old_state,new_state,reason,created_at,result)
@@ -352,6 +356,7 @@ begin
   end loop;
 end;
 $$;
+revoke all on sequence public.event_audit_id_seq from public,anon,authenticated;
 grant usage,select on sequence public.event_audit_id_seq to service_role;
 -- Lock down original private rounds again, including anonymous users' authenticated role.
 revoke all on public.online_rounds from public,anon,authenticated;
