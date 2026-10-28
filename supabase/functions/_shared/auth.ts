@@ -1,4 +1,9 @@
-import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from 'npm:jose@6.1.0';
+import {
+  createRemoteJWKSet,
+  decodeProtectedHeader,
+  jwtVerify,
+  type JWTPayload,
+} from 'npm:jose@6.1.0';
 
 export interface VerifiedIdentity {
   id: string;
@@ -14,9 +19,16 @@ function isJwksInfrastructureError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const candidate = error as { code?: unknown; name?: unknown; message?: unknown };
   if (typeof candidate.code === 'string' && candidate.code.startsWith('ERR_JWKS_')) return true;
-  if (typeof candidate.name === 'string' && /^(JWKSTimeout|JWKSNoMatchingKey|JWKSInvalid)$/.test(candidate.name))
+  if (
+    typeof candidate.name === 'string' &&
+    /^(JWKSTimeout|JWKSNoMatchingKey|JWKSInvalid)$/.test(candidate.name)
+  ) {
     return true;
-  return error instanceof TypeError && /fetch|network|timeout/i.test(String(candidate.message ?? ''));
+  }
+  return (
+    error instanceof TypeError &&
+    /fetch|network|timeout/i.test(String(candidate.message ?? ''))
+  );
 }
 
 /**
@@ -27,13 +39,20 @@ function isJwksInfrastructureError(error: unknown): boolean {
 export function createAuthenticator(
   supabaseUrl: string,
   lookupUser: UserLookup,
-): (token: string, options?: { requireCurrentUser?: boolean }) => Promise<VerifiedIdentity | null> {
+): (
+  token: string,
+  options?: { requireCurrentUser?: boolean },
+) => Promise<VerifiedIdentity | null> {
   const baseUrl = new URL(supabaseUrl);
   const issuer = new URL('/auth/v1', baseUrl).toString();
   const jwks = createRemoteJWKSet(new URL('/auth/v1/.well-known/jwks.json', baseUrl));
 
-  return async (token: string, options?: { requireCurrentUser?: boolean }): Promise<VerifiedIdentity | null> => {
+  return async (
+    token: string,
+    options?: { requireCurrentUser?: boolean },
+  ): Promise<VerifiedIdentity | null> => {
     if (options?.requireCurrentUser) return lookupUser(token);
+
     let header: ReturnType<typeof decodeProtectedHeader>;
     try {
       header = decodeProtectedHeader(token);
@@ -52,7 +71,7 @@ export function createAuthenticator(
       return null;
     }
 
-    let payload;
+    let payload: JWTPayload;
     try {
       ({ payload } = await jwtVerify(token, jwks, {
         issuer,

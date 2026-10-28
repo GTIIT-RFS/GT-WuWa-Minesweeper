@@ -20,7 +20,10 @@ const json = (body: unknown, status = 200) =>
 
 /** Authenticate every request before touching private state; credentials stay in the Edge adapter. */
 export function createCompetitionHandler(
-  authenticate: (token: string, options?: { requireCurrentUser?: boolean }) => Promise<Identity | null>,
+  authenticate: (
+    token: string,
+    options?: { requireCurrentUser?: boolean },
+  ) => Promise<Identity | null>,
   repository: RoundRepository,
   random: () => number,
   events?: EventRepository,
@@ -42,7 +45,8 @@ export function createCompetitionHandler(
     const timedRepository: RoundRepository = {
       start: (player, name, state) => measureDb(() => repository.start(player, name, state)),
       get: (id, player) => measureDb(() => repository.get(id, player)),
-      commit: (round, state, requestId) => measureDb(() => repository.commit(round, state, requestId)),
+      commit: (round, state, requestId) =>
+        measureDb(() => repository.commit(round, state, requestId)),
     };
     const timedTestRepository: RoundRepository | undefined = testRepository
       ? {
@@ -56,10 +60,13 @@ export function createCompetitionHandler(
     const reply = (body: unknown, status = 200) => {
       const totalMs = Math.max(0, performance.now() - startedAt);
       const response = json(body, status);
-      response.headers.set(
-        'Server-Timing',
-        `auth;dur=${authMs.toFixed(1)}, db;dur=${dbMs.toFixed(1)}, app;dur=${Math.max(0, totalMs - authMs - dbMs).toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
-      );
+      const timing = [
+        `auth;dur=${authMs.toFixed(1)}`,
+        `db;dur=${dbMs.toFixed(1)}`,
+        `app;dur=${Math.max(0, totalMs - authMs - dbMs).toFixed(1)}`,
+        `total;dur=${totalMs.toFixed(1)}`,
+      ].join(', ');
+      response.headers.set('Server-Timing', timing);
       response.headers.set('X-Request-Id', requestId);
       return response;
     };
@@ -100,9 +107,15 @@ export function createCompetitionHandler(
       if (token && !token.startsWith('sb_publishable_')) {
         const authStartedAt = performance.now();
         try {
-          identity = await authenticate(token, {
-            requireCurrentUser: ['awards', 'test_awards', 'admin_read', 'admin_action', 'test_admin_settle', 'test_admin_action'].includes(input.action as string),
-          });
+          const requireCurrentUser = [
+            'awards',
+            'test_awards',
+            'admin_read',
+            'admin_action',
+            'test_admin_settle',
+            'test_admin_action',
+          ].includes(input.action as string);
+          identity = await authenticate(token, { requireCurrentUser });
         } finally {
           authMs += Math.max(0, performance.now() - authStartedAt);
         }
@@ -124,14 +137,15 @@ export function createCompetitionHandler(
             (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
         )
           throw new ApiError(400, '无效测试排行榜。');
-        return reply(
-          await measureDb(() => events.testBoard(
+        const board = await measureDb(() =>
+          events.testBoard(
             input.kind as string,
             (input.stageId as string) ?? null,
             player,
             page as number,
-          )),
+          ),
         );
+        return reply(board);
       }
       if (input.action === 'overview') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
@@ -145,28 +159,35 @@ export function createCompetitionHandler(
             (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
         )
           throw new ApiError(400, '无效排行榜。');
-        return reply(
-          await measureDb(() => events.board(
+        const board = await measureDb(() =>
+          events.board(
             input.kind as string,
             (input.stageId as string) ?? null,
             player,
             page as number,
-          )),
+          ),
         );
+        return reply(board);
       }
       if (!player) throw new ApiError(401, '匿名身份已失效，请重新连接；不要清除浏览器数据。');
       if (input.action === 'awards' || input.action === 'test_awards') {
         if (!events) throw new ApiError(503, '领奖服务尚未升级。');
-        return reply(
-          await measureDb(() => input.action === 'test_awards'
-            ? events.testAwards(player)
-            : events.awards(player)),
+        const awards = await measureDb(() =>
+          input.action === 'test_awards' ? events.testAwards(player) : events.awards(player),
         );
+        return reply(awards);
       }
       if (input.action === 'test_start' || input.action === 'test_move') {
         if (!testRepository) throw new ApiError(503, '在线测试服务尚未升级。');
         const mapped = { ...input, action: input.action === 'test_start' ? 'start' : 'move' };
-        return reply(await handleCompetition(mapped, player, timedTestRepository!, Date.now(), random));
+        const result = await handleCompetition(
+          mapped,
+          player,
+          timedTestRepository!,
+          Date.now(),
+          random,
+        );
+        return reply(result);
       }
       if (input.action === 'test_admin_settle' || input.action === 'test_admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
@@ -174,7 +195,9 @@ export function createCompetitionHandler(
         if (typeof input.requestId !== 'string' || !uuid.test(input.requestId))
           throw new ApiError(400, '无效管理请求编号。');
         if (input.action === 'test_admin_settle')
-          return reply(await measureDb(() => events.testAdminSettle(player, input.requestId as string)));
+          return reply(
+            await measureDb(() => events.testAdminSettle(player, input.requestId as string)),
+          );
         if (
           !['claim', 'status', 'rollover'].includes(input.operation as string) ||
           !input.payload ||
@@ -182,14 +205,15 @@ export function createCompetitionHandler(
           Array.isArray(input.payload)
         )
           throw new ApiError(400, '无效测试管理操作。');
-        return reply(
-          await measureDb(() => events.testAdminAction(
+        const result = await measureDb(() =>
+          events.testAdminAction(
             player,
             input.requestId as string,
             input.operation as string,
             input.payload as Record<string, unknown>,
-          )),
+          ),
         );
+        return reply(result);
       }
       if (input.action === 'admin_read' || input.action === 'admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
@@ -214,14 +238,15 @@ export function createCompetitionHandler(
           Array.isArray(input.payload)
         )
           throw new ApiError(400, '无效管理操作。');
-        return reply(
-          await measureDb(() => events.adminAction(
+        const result = await measureDb(() =>
+          events.adminAction(
             player,
             input.requestId as string,
             input.operation as string,
             input.payload as Record<string, unknown>,
-          )),
+          ),
         );
+        return reply(result);
       }
       return reply(
         await handleCompetition(

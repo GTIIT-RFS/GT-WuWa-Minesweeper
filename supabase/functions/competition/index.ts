@@ -6,13 +6,9 @@ import type { EventRepository } from '../_shared/event-types.ts';
 
 // The Supabase runtime supplies these values on the server. Never prefix them with VITE_.
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const server = createClient(
-  supabaseUrl,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  {
-    auth: { persistSession: false, autoRefreshToken: false },
-  },
-);
+const server = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 const dbError = (error: { code?: string } | null) => {
   if (!error) return;
   if (error.code === '42501') throw new ApiError(403, '没有权限或领奖凭证无效。');

@@ -4,8 +4,11 @@ import { newOnlineGame, type Round, type RoundRepository } from './competition.t
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
+
 function assertEquals<T>(actual: T, expected: T, message: string): void {
-  if (actual !== expected) throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
+  if (actual !== expected) {
+    throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
+  }
 }
 
 const playerId = '11111111-1111-4111-8111-111111111111';
@@ -35,7 +38,7 @@ const repository: RoundRepository = {
 Deno.test('OPTIONS responses cache preflight and expose timing headers', async () => {
   const handler = createCompetitionHandler(async () => null, repository, () => 0);
   const response = await handler(new Request('https://test/competition', { method: 'OPTIONS' }));
-  assertEquals(response.status, 200, 'OPTIONS status');
+  assert(response.status === 200, 'OPTIONS status must be 200');
   assertEquals(response.headers.get('access-control-max-age'), '600', 'preflight cache duration');
   assert(
     response.headers.get('access-control-expose-headers')?.includes('Server-Timing'),
@@ -60,7 +63,7 @@ Deno.test('POST responses include non-sensitive server timing and a request id',
       body: JSON.stringify({ action: 'start', name: 'Latency test' }),
     }),
   );
-  assertEquals(response.status, 200, 'start status');
+  assert(response.status === 200, 'start status must be 200');
   const timing = response.headers.get('server-timing') ?? '';
   assert(/auth;dur=\d+(\.\d+)?/.test(timing), 'auth timing metric missing');
   assert(/db;dur=\d+(\.\d+)?/.test(timing), 'database timing metric missing');
@@ -81,7 +84,7 @@ Deno.test('error responses retain timing diagnostics without exposing token data
       body: JSON.stringify({ action: 'move' }),
     }),
   );
-  assertEquals(response.status, 401, 'unauthenticated status');
+  assert(response.status === 401, 'unauthenticated status must be 401');
   assert(response.headers.has('server-timing'), 'error response timing missing');
   assert(!(await response.text()).includes('verified-test-token'), 'response leaked credential text');
 });
