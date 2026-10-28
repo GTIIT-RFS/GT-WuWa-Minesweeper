@@ -1,16 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.95.3';
 import { ApiError, type Round, type RoundRepository } from '../_shared/competition.ts';
+import { createAuthenticator } from '../_shared/auth.ts';
 import { createCompetitionHandler } from '../_shared/http.ts';
 import type { EventRepository } from '../_shared/event-types.ts';
 
 // The Supabase runtime supplies these values on the server. Never prefix them with VITE_.
-const server = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  {
-    auth: { persistSession: false, autoRefreshToken: false },
-  },
-);
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const server = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 const dbError = (error: { code?: string } | null) => {
   if (!error) return;
   if (error.code === '42501') throw new ApiError(403, '没有权限或领奖凭证无效。');
@@ -104,16 +102,18 @@ const events: EventRepository = {
       p_payload: payload,
     }),
 };
+const authenticate = createAuthenticator(supabaseUrl, async (token) => {
+  // Auth.getUser remains the compatibility path for legacy HS256 tokens and JWKS outages.
+  const {
+    data: { user },
+    error,
+  } = await server.auth.getUser(token);
+  return !error && user ? { id: user.id, isAnonymous: user.is_anonymous === true } : null;
+});
+
 Deno.serve(
   createCompetitionHandler(
-    async (token) => {
-      // Do not authorize with decoded JWT contents or editable user_metadata.
-      const {
-        data: { user },
-        error,
-      } = await server.auth.getUser(token);
-      return !error && user ? { id: user.id, isAnonymous: user.is_anonymous === true } : null;
-    },
+    authenticate,
     repository,
     () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
     events,
