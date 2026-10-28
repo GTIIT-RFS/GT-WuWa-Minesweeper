@@ -29,7 +29,9 @@ async function withJwks(
     },
   );
   try {
-    await run(`http://127.0.0.1:${server.addr.port}`, privateKey, publicJwk);
+    const address = server.addr;
+    if (address.transport !== 'tcp') throw new Error('Expected a TCP test server');
+    await run(`http://127.0.0.1:${address.port}`, privateKey, publicJwk);
   } finally {
     await server.shutdown();
   }
