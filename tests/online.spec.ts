@@ -42,6 +42,30 @@ test('anonymous creation, restored session, touch flags and authoritative victor
   expect(errors).toEqual([]);
 });
 
+test('online reveal and flag actions show immediate pending feedback before server confirmation', async ({
+  page,
+  eventServer,
+}) => {
+  await start(page);
+
+  const firstCell = page.locator('.board .cell').first();
+  eventServer.delayNextMove(450);
+  await firstCell.click();
+  await expect(firstCell).toHaveClass(/pending-reveal/);
+  await expect(firstCell).toHaveAttribute('aria-label', /等待服务器确认/);
+  await expect(page.locator('.online-game p[role="status"]')).toContainText('等待服务器确认');
+  await expect(firstCell).not.toHaveClass(/pending-action/);
+
+  await page.getByRole('button', { name: /在线插旗模式/ }).click();
+  const hiddenCell = page.locator('.board .cell:not(.open)').last();
+  eventServer.delayNextMove(450);
+  await hiddenCell.click();
+  await expect(hiddenCell).toHaveClass(/pending-flag/);
+  await expect(hiddenCell).toHaveAttribute('aria-label', /等待服务器确认/);
+  await expect(hiddenCell).not.toHaveClass(/pending-action/);
+  await expect(hiddenCell).toHaveAttribute('aria-label', /已插旗/);
+});
+
 test('a lost move response retries safely and loss still triggers the potato explosion', async ({
   page,
   eventServer,
@@ -50,6 +74,7 @@ test('a lost move response retries safely and loss still triggers the potato exp
   eventServer.dropNextMove();
   await page.getByRole('button', { name: '第1行第1列，未翻开', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试上次请求' })).toBeVisible();
+  await expect(page.locator('.cell.pending-retry')).toHaveCount(1);
   expect(
     (
       await eventServer.rows<{ revision: number }>(
@@ -59,6 +84,7 @@ test('a lost move response retries safely and loss still triggers the potato exp
   ).toBe(1);
   await page.getByRole('button', { name: '重试上次请求' }).click();
   await expect(page.getByRole('button', { name: /第1行第1列，周围/ })).toBeVisible();
+  await expect(page.locator('.cell.pending-action')).toHaveCount(0);
   expect(
     (
       await eventServer.rows<{ revision: number }>(
