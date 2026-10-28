@@ -184,18 +184,29 @@ export function OnlineLeaderboard({
         <>
           <div className="stage-banner" role="status">
             <strong>{data ? labels[data.state] : '正在读取服务器赛程…'}</strong>
-            {stage && (
-              <span>
-                {testMode ? '测试轮次' : `第 ${stage.round_no} 轮`} · 北京时间{' '}
-                {beijing(stage.starts_at, true)}–{beijing(stage.ends_at)}
-              </span>
-            )}
+            {stage &&
+              (testMode ? (
+                <span>测试轮次 · 长期开放（工作人员可随时结算）</span>
+              ) : (
+                <span>
+                  第 {stage.round_no} 轮 · 北京时间 {beijing(stage.starts_at, true)}–
+                  {beijing(stage.ends_at)}
+                </span>
+              ))}
           </div>
           <div className="event-schedule">
             {data?.stages.map((s) => (
               <span key={s.id} className={s.id === stage?.id ? 'current-stage' : ''}>
-                {testMode ? '测试轮次' : `第${s.round_no}轮`} {beijing(s.starts_at)}–
-                {beijing(s.ends_at)} {s.settled_at ? '已结算' : ''}
+                {testMode ? (
+                  <>
+                    测试轮次 · {s.settled_at ? `已结算 ${beijing(s.settled_at, true)}` : '长期开放'}
+                  </>
+                ) : (
+                  <>
+                    第{s.round_no}轮 {beijing(s.starts_at)}–{beijing(s.ends_at)}{' '}
+                    {s.settled_at ? '已结算' : ''}
+                  </>
+                )}
               </span>
             ))}
           </div>
@@ -236,7 +247,9 @@ export function OnlineLeaderboard({
                     .filter((s) => s.settled_at)
                     .map((s) => (
                       <option key={s.id} value={s.id}>
-                        第 {s.round_no} 轮 · {beijing(s.settled_at!, true)} 结算
+                        {testMode
+                          ? `测试轮次 · ${beijing(s.settled_at!, true)} 结算`
+                          : `第 ${s.round_no} 轮 · ${beijing(s.settled_at!, true)} 结算`}
                       </option>
                     ))}
                 </select>
