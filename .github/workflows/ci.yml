@@ -25,8 +25,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.9.6
-      - run: deno check --no-lock supabase/functions/competition/index.ts
-      - run: deno test --no-lock --allow-net=127.0.0.1 supabase/functions/_shared/auth.test.ts supabase/functions/_shared/http.test.ts
+      - run: deno check --no-lock --config supabase/functions/deno.json supabase/functions/competition/index.ts
+      - run: deno test --no-lock --config supabase/functions/deno.json --allow-net=127.0.0.1 supabase/functions/_shared/auth.test.ts supabase/functions/_shared/http.test.ts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
