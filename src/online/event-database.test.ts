@@ -448,9 +448,10 @@ it('keeps test games, settlement, credentials and claims isolated from the offic
     ]),
   ).toMatchObject({ ok: true });
   expect(
-    await rows<{ competition_id: string }>('select competition_id from public.event_claims where award_id=$1', [
-      testAward!.id,
-    ]),
+    await rows<{ competition_id: string }>(
+      'select competition_id from public.event_claims where award_id=$1',
+      [testAward!.id],
+    ),
   ).toEqual([{ competition_id: initialTest.event.id }]);
 
   const formalAfter = await rpc<{ awards: { display_name: string }[] }>('event_overview', [player]);
