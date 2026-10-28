@@ -129,8 +129,23 @@ export function OnlineCompetition({
   const pendingMove =
     pending?.action === 'move' &&
     (pending.move.kind === 'reveal' || pending.move.kind === 'flag')
-      ? { index: pending.move.index, kind: pending.move.kind, retry: !working }
+      ? {
+          index: pending.move.index,
+          kind: pending.move.kind,
+          retry: !working,
+        }
       : null;
+  let moveStatus = '每次翻格和成绩均由服务器验证。';
+  if (pending) {
+    moveStatus = pendingMove
+      ? '操作未确认；标记仅表示待处理，请重试或重新连接。计时继续。'
+      : '操作尚未确认，请重试。计时继续。';
+  }
+  if (working) {
+    moveStatus = pendingMove
+      ? '已标记本次操作，正在等待服务器确认…'
+      : '正在等待服务器确认…';
+  }
   return (
     <div className="online-layout">
       <section className="panel online-game">
@@ -253,17 +268,7 @@ export function OnlineCompetition({
                 <button aria-pressed={flagMode} onClick={() => setFlagMode(!flagMode)}>
                   ⚑ 在线插旗模式 {flagMode ? '开启' : '关闭'}
                 </button>
-                <p role="status">
-                  {working
-                    ? pendingMove
-                      ? '已标记本次操作，正在等待服务器确认…'
-                      : '正在等待服务器确认…'
-                    : pending
-                      ? pendingMove
-                        ? '操作未确认；标记仅表示待处理，请重试或重新连接。计时继续。'
-                        : '操作尚未确认，请重试。计时继续。'
-                      : '每次翻格和成绩均由服务器验证。'}
-                </p>
+                <p role="status">{moveStatus}</p>
               </>
             )}
           </>
