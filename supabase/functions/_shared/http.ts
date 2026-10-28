@@ -103,7 +103,11 @@ export function createCompetitionHandler(
       if (!body || typeof body !== 'object' || Array.isArray(body))
         throw new ApiError(400, '无效请求。');
       const input = body as Record<string, unknown>;
-      const token = request.headers.get('Authorization')?.match(/^***;
+      const authorization = request.headers.get('Authorization') ?? '';
+      const token =
+        authorization.slice(0, 6).toLowerCase() === 'bearer' && authorization[6] === ' '
+          ? authorization.slice(7).trim()
+          : undefined;
       let identity: Identity | null = null;
       if (token && !token.startsWith('sb_publishable_')) {
         const authStartedAt = performance.now();
