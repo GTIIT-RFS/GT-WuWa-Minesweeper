@@ -63,7 +63,7 @@ Deno.test('POST responses include non-sensitive server timing and a request id',
   assertEquals(response.status, 200, 'start status');
   const timing = response.headers.get('server-timing') ?? '';
   assert(/auth;dur=\d+(\.\d+)?/.test(timing), 'auth timing metric missing');
-  assert(/db;dur=\\d+(\\.\\d+)?/.test(timing), 'database timing metric missing');
+  assert(/db;dur=\d+(\.\d+)?/.test(timing), 'database timing metric missing');
   assert(/app;dur=\d+(\.\d+)?/.test(timing), 'application timing metric missing');
   assert(/total;dur=\d+(\.\d+)?/.test(timing), 'total timing metric missing');
   assert(
