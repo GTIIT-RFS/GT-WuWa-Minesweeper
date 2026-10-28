@@ -1,0 +1,5 @@
+project_id = "gt-wuwa-leaderboard"
+
+[functions.competition]
+# Authenticate inside the handler with Auth.getUser; supports publishable keys.
+verify_jwt = false

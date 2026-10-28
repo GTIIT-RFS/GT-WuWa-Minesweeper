@@ -26,14 +26,27 @@ import { Board } from './components/Board';
 import { Explosion } from './components/Explosion';
 import { AdminPanel } from './components/AdminPanel';
 import { Leaderboard } from './components/Leaderboard';
+import { OnlineCompetition } from './components/OnlineCompetition';
+import { OnlineLeaderboard } from './components/OnlineLeaderboard';
+import { AwardWallet } from './components/AwardWallet';
+import { EventAdmin } from './components/EventAdmin';
 
-type View = 'menu' | 'game' | 'scores' | 'admin';
+type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'display' | 'awards' | 'event-admin';
+const hashView = (): View =>
+  ['online', 'display', 'awards', 'event-admin'].includes(location.hash.slice(1).split('?')[0])
+    ? (location.hash.slice(1).split('?')[0] as View)
+    : 'menu';
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [scores, setScores] = useState(loadScores);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const urlRef = useRef<Record<string, string>>({});
-  const [view, setView] = useState<View>('menu');
+  const [view, setView] = useState<View>(hashView);
+  useEffect(() => {
+    const onHash = () => navigate(hashView());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  });
   const [difficulty, setDifficulty] = useState('normal');
   const [custom, setCustom] = useState<BoardConfig>({ rows: 8, cols: 8, mines: 10 });
   const [name, setName] = useState('');
@@ -214,13 +227,25 @@ export default function App() {
   }
   function navigate(next: View) {
     if (gameRef.current.status === 'playing' && view === 'game') {
-      if (!confirm('离开将结束当前对局，且不会记录这局成绩。确定离开？')) return;
+      if (!confirm('离开将结束当前对局，且不会记录这局成绩。确定离开？')) {
+        history.replaceState(null, '', `${location.pathname}${location.search}`);
+        return;
+      }
       const reset = createGame(game.config);
       gameRef.current = reset;
       setGame(reset);
       started.current = null;
       setElapsed(0);
     }
+    // Hash routes work on GitHub Pages without server rewrites.
+    // Keep a private claim fragment until EventAdmin reads and removes it on mount.
+    const fragment =
+      next === 'event-admin' && location.hash.startsWith('#event-admin?')
+        ? location.hash
+        : ['online', 'display', 'awards', 'event-admin'].includes(next)
+          ? `#${next}`
+          : '';
+    history.replaceState(null, '', `${location.pathname}${location.search}${fragment}`);
     setView(next);
   }
   async function fullscreen() {
@@ -244,7 +269,7 @@ export default function App() {
   }[game.status];
   return (
     <div
-      className={`app ${settings.effects.reduced ? 'reduce-motion' : ''} ${explosion !== null ? 'is-exploding' : ''}`}
+      className={`app ${view === 'display' ? 'projection-mode' : ''} ${settings.effects.reduced ? 'reduce-motion' : ''} ${explosion !== null ? 'is-exploding' : ''}`}
       style={{ '--screen-shake': `${settings.effects.shake}px` } as CSSProperties}
     >
       <div className="background-asset">
@@ -273,6 +298,12 @@ export default function App() {
             onClick={() => navigate('scores')}
           >
             排行榜
+          </button>
+          <button
+            aria-current={view === 'online' ? 'page' : undefined}
+            onClick={() => navigate('online')}
+          >
+            在线比赛
           </button>
           <button
             className="icon-button"
@@ -555,6 +586,17 @@ export default function App() {
             onClose={() => setView('menu')}
           />
         )}
+        {view === 'online' && (
+          <OnlineCompetition
+            settings={settings}
+            urls={urls}
+            sound={sound}
+            onExplosion={() => setExplosion(++explosionCounter.current)}
+          />
+        )}
+        {view === 'display' && <OnlineLeaderboard display />}
+        {view === 'awards' && <AwardWallet />}
+        {view === 'event-admin' && <EventAdmin />}
         {view === 'admin' &&
           (assetsReady ? (
             <AdminPanel
@@ -576,6 +618,7 @@ export default function App() {
         </span>
         <span>
           本机独立保存 <button onClick={() => navigate('admin')}>⚙ 管理员设置</button>
+          <button onClick={() => navigate('event-admin')}>赛事后台</button>
         </span>
       </footer>
       {explosion !== null && (

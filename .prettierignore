@@ -5,3 +5,5 @@ playwright-report
 test-results
 release
 tools/windows-launcher/web
+supabase/.temp
+supabase/.branches
