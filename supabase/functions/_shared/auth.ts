@@ -24,12 +24,16 @@ function isJwksInfrastructureError(error: unknown): boolean {
  * within the Edge Function isolate. Legacy HS256 tokens and JWKS infrastructure failures
  * use Auth.getUser as a compatibility fallback; invalid signatures/claims fail closed.
  */
-export function createAuthenticator(supabaseUrl: string, lookupUser: UserLookup): UserLookup {
+export function createAuthenticator(
+  supabaseUrl: string,
+  lookupUser: UserLookup,
+): (token: string, options?: { requireCurrentUser?: boolean }) => Promise<VerifiedIdentity | null> {
   const baseUrl = new URL(supabaseUrl);
   const issuer = new URL('/auth/v1', baseUrl).toString();
   const jwks = createRemoteJWKSet(new URL('/auth/v1/.well-known/jwks.json', baseUrl));
 
-  return async (token: string): Promise<VerifiedIdentity | null> => {
+  return async (token: string, options?: { requireCurrentUser?: boolean }): Promise<VerifiedIdentity | null> => {
+    if (options?.requireCurrentUser) return lookupUser(token);
     let header: ReturnType<typeof decodeProtectedHeader>;
     try {
       header = decodeProtectedHeader(token);
