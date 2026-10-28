@@ -4,18 +4,18 @@ export interface Identity {
   id: string;
   isAnonymous: boolean;
 }
-
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // Preflight is independent of user state and safe to cache briefly in the browser.
+  'Access-Control-Max-Age': '600',
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
-
 /** Authenticate every request before touching private state; credentials stay in the Edge adapter. */
 export function createCompetitionHandler(
   authenticate: (token: string) => Promise<Identity | null>,
@@ -28,6 +28,7 @@ export function createCompetitionHandler(
     if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
     if (request.method !== 'POST') return json({ error: '仅支持 POST。' }, 405);
     try {
+      const requestStarted = performance.now();
       // Bound the stream before parsing, even for chunked requests without Content-Length.
       const reader = request.body?.getReader();
       if (!reader) throw new ApiError(400, '请求为空。');
@@ -59,13 +60,23 @@ export function createCompetitionHandler(
         throw new ApiError(400, '无效请求。');
       const input = body as Record<string, unknown>;
       const token = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i)?.[1];
+      const authStarted = performance.now();
       const identity =
         token && !token.startsWith('sb_publishable_') ? await authenticate(token) : null;
+      const authMs = performance.now() - authStarted;
+      // Keep timing diagnostic low-cardinality: no tokens, user IDs, request bodies, or SQL values.
+      console.info(
+        JSON.stringify({
+          event: 'competition_request',
+          action: typeof input.action === 'string' ? input.action : 'unknown',
+          auth_ms: Math.round(authMs * 100) / 100,
+          pre_db_ms: Math.round((performance.now() - requestStarted - authMs) * 100) / 100,
+        }),
+      );
       const player = identity?.id ?? null;
       const page = input.page === undefined ? 0 : input.page;
       if (!Number.isInteger(page) || (page as number) < 0 || (page as number) > 10000)
         throw new ApiError(400, '无效页码。');
-      // Public results do not create anonymous accounts. A supplied userId is always ignored.
       if (input.action === 'test_overview') {
         if (!events) throw new ApiError(503, '测试服务尚未升级。');
         return json(await events.testOverview(player));
