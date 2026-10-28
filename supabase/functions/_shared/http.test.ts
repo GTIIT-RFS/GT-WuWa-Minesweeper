@@ -1,5 +1,5 @@
 import { createCompetitionHandler } from './http.ts';
-import { newOnlineGame, type Round, type RoundRepository } from './competition.ts';
+import type { Round, RoundRepository } from './competition.ts';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
