@@ -30,13 +30,35 @@ export function createCompetitionHandler(
     if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
     const startedAt = performance.now();
     let authMs = 0;
+    let dbMs = 0;
+    const measureDb = async <T>(operation: () => Promise<T>): Promise<T> => {
+      const dbStartedAt = performance.now();
+      try {
+        return await operation();
+      } finally {
+        dbMs += Math.max(0, performance.now() - dbStartedAt);
+      }
+    };
+    const timedRepository: RoundRepository = {
+      start: (player, name, state) => measureDb(() => repository.start(player, name, state)),
+      get: (id, player) => measureDb(() => repository.get(id, player)),
+      commit: (round, state, requestId) => measureDb(() => repository.commit(round, state, requestId)),
+    };
+    const timedTestRepository: RoundRepository | undefined = testRepository
+      ? {
+          start: (player, name, state) => measureDb(() => testRepository.start(player, name, state)),
+          get: (id, player) => measureDb(() => testRepository.get(id, player)),
+          commit: (round, state, requestId) =>
+            measureDb(() => testRepository.commit(round, state, requestId)),
+        }
+      : undefined;
     const requestId = crypto.randomUUID();
     const reply = (body: unknown, status = 200) => {
       const totalMs = Math.max(0, performance.now() - startedAt);
       const response = json(body, status);
       response.headers.set(
         'Server-Timing',
-        `auth;dur=${authMs.toFixed(1)}, app;dur=${Math.max(0, totalMs - authMs).toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
+        `auth;dur=${authMs.toFixed(1)}, db;dur=${dbMs.toFixed(1)}, app;dur=${Math.max(0, totalMs - authMs - dbMs).toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
       );
       response.headers.set('X-Request-Id', requestId);
       return response;
@@ -92,7 +114,7 @@ export function createCompetitionHandler(
       // Public results do not create anonymous accounts. A supplied userId is always ignored.
       if (input.action === 'test_overview') {
         if (!events) throw new ApiError(503, '测试服务尚未升级。');
-        return reply(await events.testOverview(player));
+        return reply(await measureDb(() => events.testOverview(player)));
       }
       if (input.action === 'test_board') {
         if (!events) throw new ApiError(503, '测试服务尚未升级。');
@@ -103,17 +125,17 @@ export function createCompetitionHandler(
         )
           throw new ApiError(400, '无效测试排行榜。');
         return reply(
-          await events.testBoard(
+          await measureDb(() => events.testBoard(
             input.kind as string,
             (input.stageId as string) ?? null,
             player,
             page as number,
-          ),
+          )),
         );
       }
       if (input.action === 'overview') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
-        return reply(await events.overview(player));
+        return reply(await measureDb(() => events.overview(player)));
       }
       if (input.action === 'board') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
@@ -124,27 +146,27 @@ export function createCompetitionHandler(
         )
           throw new ApiError(400, '无效排行榜。');
         return reply(
-          await events.board(
+          await measureDb(() => events.board(
             input.kind as string,
             (input.stageId as string) ?? null,
             player,
             page as number,
-          ),
+          )),
         );
       }
       if (!player) throw new ApiError(401, '匿名身份已失效，请重新连接；不要清除浏览器数据。');
       if (input.action === 'awards' || input.action === 'test_awards') {
         if (!events) throw new ApiError(503, '领奖服务尚未升级。');
         return reply(
-          input.action === 'test_awards'
-            ? await events.testAwards(player)
-            : await events.awards(player),
+          await measureDb(() => input.action === 'test_awards'
+            ? events.testAwards(player)
+            : events.awards(player)),
         );
       }
       if (input.action === 'test_start' || input.action === 'test_move') {
         if (!testRepository) throw new ApiError(503, '在线测试服务尚未升级。');
         const mapped = { ...input, action: input.action === 'test_start' ? 'start' : 'move' };
-        return reply(await handleCompetition(mapped, player, testRepository, Date.now(), random));
+        return reply(await handleCompetition(mapped, player, timedTestRepository!, Date.now(), random));
       }
       if (input.action === 'test_admin_settle' || input.action === 'test_admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
@@ -152,7 +174,7 @@ export function createCompetitionHandler(
         if (typeof input.requestId !== 'string' || !uuid.test(input.requestId))
           throw new ApiError(400, '无效管理请求编号。');
         if (input.action === 'test_admin_settle')
-          return reply(await events.testAdminSettle(player, input.requestId));
+          return reply(await measureDb(() => events.testAdminSettle(player, input.requestId as string)));
         if (
           !['claim', 'status', 'rollover'].includes(input.operation as string) ||
           !input.payload ||
@@ -161,19 +183,19 @@ export function createCompetitionHandler(
         )
           throw new ApiError(400, '无效测试管理操作。');
         return reply(
-          await events.testAdminAction(
+          await measureDb(() => events.testAdminAction(
             player,
-            input.requestId,
+            input.requestId as string,
             input.operation as string,
             input.payload as Record<string, unknown>,
-          ),
+          )),
         );
       }
       if (input.action === 'admin_read' || input.action === 'admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
         if (!events) throw new ApiError(503, '管理服务尚未升级。');
         if (input.action === 'admin_read')
-          return reply(await events.adminRead(player, page as number));
+          return reply(await measureDb(() => events.adminRead(player, page as number)));
         if (
           typeof input.requestId !== 'string' ||
           !uuid.test(input.requestId) ||
@@ -193,19 +215,19 @@ export function createCompetitionHandler(
         )
           throw new ApiError(400, '无效管理操作。');
         return reply(
-          await events.adminAction(
+          await measureDb(() => events.adminAction(
             player,
-            input.requestId,
+            input.requestId as string,
             input.operation as string,
             input.payload as Record<string, unknown>,
-          ),
+          )),
         );
       }
       return reply(
         await handleCompetition(
           body as Record<string, unknown>,
           player,
-          repository,
+          timedRepository,
           Date.now(),
           random,
         ),
