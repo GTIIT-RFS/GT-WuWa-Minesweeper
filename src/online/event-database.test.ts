@@ -62,18 +62,18 @@ beforeAll(async () => {
 }, 30000);
 afterAll(() => db.close());
 it('installs an additive upgrade and keeps the event closed until a date is configured', async () => {
-  expect(await rows('select * from public.online_competitions')).toHaveLength(1);
+  expect(await rows("select * from public.online_competitions where id='club-night-v1'")).toHaveLength(1);
   await expect(start()).rejects.toThrow(/event not open/);
   await db.query('insert into public.event_admins(user_id) values ($1)', [admin]);
   await adminAction('configure', { date: '2030-06-01' });
   const stages = await rows<{ starts_at: string; ends_at: string }>(
-    'select * from public.event_stages order by round_no',
+    "select * from public.event_stages where competition_id='club-night-v1' order by round_no",
   );
   expect(stages).toHaveLength(4);
   expect(new Date(stages[0].starts_at).toISOString()).toBe('2030-06-01T10:00:00.000Z');
   expect(new Date(stages[3].ends_at).toISOString()).toBe('2030-06-01T14:00:00.000Z');
   const fourth = (
-    await rows<{ id: string }>('select id from public.event_stages where round_no=4')
+    await rows<{ id: string }>("select id from public.event_stages where competition_id='club-night-v1' and round_no=4")
   )[0].id;
   await adminAction('prizes', { stageId: fourth, count: 3 });
   await expect(adminAction('prizes', { stageId: fourth, count: 21 })).rejects.toThrow(
@@ -127,7 +127,7 @@ it('enforces 18:00 open and 18:57 new-game cutoff using the database clock', asy
 
 it('preserves each win, only improves a stage best and prepares multiple ranked candidates', async () => {
   const firstStage = (
-    await rows<{ id: string }>('select id from public.event_stages where round_no=1')
+    await rows<{ id: string }>("select id from public.event_stages where competition_id='club-night-v1' and round_no=1")
   )[0].id;
   expect(
     await rows('select * from public.event_bests where stage_id=$1', [firstStage]),
