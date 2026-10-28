@@ -31,9 +31,9 @@ import { OnlineLeaderboard } from './components/OnlineLeaderboard';
 import { AwardWallet } from './components/AwardWallet';
 import { EventAdmin } from './components/EventAdmin';
 
-type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'display' | 'awards' | 'event-admin';
+type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'online-test' | 'display' | 'awards' | 'test-awards' | 'event-admin';
 const hashView = (): View =>
-  ['online', 'display', 'awards', 'event-admin'].includes(location.hash.slice(1).split('?')[0])
+  ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(location.hash.slice(1).split('?')[0])
     ? (location.hash.slice(1).split('?')[0] as View)
     : 'menu';
 export default function App() {
@@ -242,7 +242,7 @@ export default function App() {
     const fragment =
       next === 'event-admin' && location.hash.startsWith('#event-admin?')
         ? location.hash
-        : ['online', 'display', 'awards', 'event-admin'].includes(next)
+        : ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(next)
           ? `#${next}`
           : '';
     history.replaceState(null, '', `${location.pathname}${location.search}${fragment}`);
@@ -586,16 +586,18 @@ export default function App() {
             onClose={() => setView('menu')}
           />
         )}
-        {view === 'online' && (
+        {(view === 'online' || view === 'online-test') && (
           <OnlineCompetition
             settings={settings}
             urls={urls}
             sound={sound}
             onExplosion={() => setExplosion(++explosionCounter.current)}
+            testMode={view === 'online-test'}
           />
         )}
         {view === 'display' && <OnlineLeaderboard display />}
         {view === 'awards' && <AwardWallet />}
+        {view === 'test-awards' && <AwardWallet testMode />}
         {view === 'event-admin' && <EventAdmin />}
         {view === 'admin' &&
           (assetsReady ? (
