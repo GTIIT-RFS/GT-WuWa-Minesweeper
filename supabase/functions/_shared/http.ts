@@ -20,7 +20,7 @@ const json = (body: unknown, status = 200) =>
 
 /** Authenticate every request before touching private state; credentials stay in the Edge adapter. */
 export function createCompetitionHandler(
-  authenticate: (token: string) => Promise<Identity | null>,
+  authenticate: (token: string, options?: { requireCurrentUser?: boolean }) => Promise<Identity | null>,
   repository: RoundRepository,
   random: () => number,
   events?: EventRepository,
@@ -78,7 +78,9 @@ export function createCompetitionHandler(
       if (token && !token.startsWith('sb_publishable_')) {
         const authStartedAt = performance.now();
         try {
-          identity = await authenticate(token);
+          identity = await authenticate(token, {
+            requireCurrentUser: ['awards', 'test_awards', 'admin_read', 'admin_action', 'test_admin_settle', 'test_admin_action'].includes(input.action as string),
+          });
         } finally {
           authMs += Math.max(0, performance.now() - authStartedAt);
         }
@@ -100,7 +102,7 @@ export function createCompetitionHandler(
             (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
         )
           throw new ApiError(400, '无效测试排行榜。');
-        return json(
+        return reply(
           await events.testBoard(
             input.kind as string,
             (input.stageId as string) ?? null,
@@ -111,7 +113,7 @@ export function createCompetitionHandler(
       }
       if (input.action === 'overview') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
-        return json(await events.overview(player));
+        return reply(await events.overview(player));
       }
       if (input.action === 'board') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
@@ -121,7 +123,7 @@ export function createCompetitionHandler(
             (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
         )
           throw new ApiError(400, '无效排行榜。');
-        return json(
+        return reply(
           await events.board(
             input.kind as string,
             (input.stageId as string) ?? null,
@@ -133,7 +135,7 @@ export function createCompetitionHandler(
       if (!player) throw new ApiError(401, '匿名身份已失效，请重新连接；不要清除浏览器数据。');
       if (input.action === 'awards' || input.action === 'test_awards') {
         if (!events) throw new ApiError(503, '领奖服务尚未升级。');
-        return json(
+        return reply(
           input.action === 'test_awards'
             ? await events.testAwards(player)
             : await events.awards(player),
@@ -142,7 +144,7 @@ export function createCompetitionHandler(
       if (input.action === 'test_start' || input.action === 'test_move') {
         if (!testRepository) throw new ApiError(503, '在线测试服务尚未升级。');
         const mapped = { ...input, action: input.action === 'test_start' ? 'start' : 'move' };
-        return json(await handleCompetition(mapped, player, testRepository, Date.now(), random));
+        return reply(await handleCompetition(mapped, player, testRepository, Date.now(), random));
       }
       if (input.action === 'test_admin_settle' || input.action === 'test_admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
@@ -150,7 +152,7 @@ export function createCompetitionHandler(
         if (typeof input.requestId !== 'string' || !uuid.test(input.requestId))
           throw new ApiError(400, '无效管理请求编号。');
         if (input.action === 'test_admin_settle')
-          return json(await events.testAdminSettle(player, input.requestId));
+          return reply(await events.testAdminSettle(player, input.requestId));
         if (
           !['claim', 'status', 'rollover'].includes(input.operation as string) ||
           !input.payload ||
@@ -158,7 +160,7 @@ export function createCompetitionHandler(
           Array.isArray(input.payload)
         )
           throw new ApiError(400, '无效测试管理操作。');
-        return json(
+        return reply(
           await events.testAdminAction(
             player,
             input.requestId,
@@ -171,7 +173,7 @@ export function createCompetitionHandler(
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
         if (!events) throw new ApiError(503, '管理服务尚未升级。');
         if (input.action === 'admin_read')
-          return json(await events.adminRead(player, page as number));
+          return reply(await events.adminRead(player, page as number));
         if (
           typeof input.requestId !== 'string' ||
           !uuid.test(input.requestId) ||
@@ -190,7 +192,7 @@ export function createCompetitionHandler(
           Array.isArray(input.payload)
         )
           throw new ApiError(400, '无效管理操作。');
-        return json(
+        return reply(
           await events.adminAction(
             player,
             input.requestId,
@@ -199,7 +201,7 @@ export function createCompetitionHandler(
           ),
         );
       }
-      return json(
+      return reply(
         await handleCompetition(
           body as Record<string, unknown>,
           player,
@@ -209,8 +211,8 @@ export function createCompetitionHandler(
         ),
       );
     } catch (error) {
-      if (error instanceof ApiError) return json({ error: error.message }, error.status);
-      return json({ error: '排行榜服务暂时不可用，请重试。' }, 503);
+      if (error instanceof ApiError) return reply({ error: error.message }, error.status);
+      return reply({ error: '排行榜服务暂时不可用，请重试。' }, 503);
     }
   };
 }
