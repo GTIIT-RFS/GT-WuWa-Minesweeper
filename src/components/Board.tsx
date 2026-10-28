@@ -44,11 +44,7 @@ export function Board({
                   .join(' ')
               : '';
           const pendingSuffix =
-            isPending && pendingMove
-              ? pendingMove.retry
-                ? '，待重试'
-                : '，等待服务器确认'
-              : '';
+            isPending && pendingMove ? (pendingMove.retry ? '，待重试' : '，等待服务器确认') : '';
           const cellClass = [
             'cell',
             cell.revealed ? 'open' : '',
