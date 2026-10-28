@@ -128,6 +128,7 @@ export function OnlineCompetition({
   }
   const pendingMove =
     pending?.action === 'move' &&
+    typeof pending.move.index === 'number' &&
     (pending.move.kind === 'reveal' || pending.move.kind === 'flag')
       ? {
           index: pending.move.index,
@@ -142,9 +143,7 @@ export function OnlineCompetition({
       : '操作尚未确认，请重试。计时继续。';
   }
   if (working) {
-    moveStatus = pendingMove
-      ? '已标记本次操作，正在等待服务器确认…'
-      : '正在等待服务器确认…';
+    moveStatus = pendingMove ? '已标记本次操作，正在等待服务器确认…' : '正在等待服务器确认…';
   }
   return (
     <div className="online-layout">
