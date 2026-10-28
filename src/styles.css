@@ -625,6 +625,38 @@ h1 > span {
 .cell.open:hover {
   transform: none;
 }
+.cell.pending-action {
+  border-color: var(--mint);
+  box-shadow:
+    inset 0 0 0 2px #8fe3d444,
+    0 0 12px #8fe3d422;
+  transform: none;
+}
+.cell.pending-action.pending-retry {
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 0 0 2px #f5bd7344,
+    0 0 12px #f5bd7322;
+}
+.cell-pending-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: #071820b8;
+  color: var(--mint);
+  font: 700 20px monospace;
+  pointer-events: none;
+}
+.cell.pending-flag .cell-pending-indicator {
+  color: var(--gold);
+  font-size: 22px;
+}
+.cell.pending-retry .cell-pending-indicator {
+  background: #2a2116d9;
+  color: var(--gold);
+}
 .cell-content {
   position: relative;
   display: grid;
@@ -1632,6 +1664,9 @@ summary {
 }
 .online-board-lock:disabled {
   opacity: 0.7;
+}
+.online-board-lock:disabled:has(.cell.pending-action) {
+  opacity: 1;
 }
 .online-status {
   font-size: 18px !important;

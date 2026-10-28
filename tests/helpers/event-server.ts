@@ -16,6 +16,7 @@ export async function createEventServer(page: Page) {
   let signupCount = 0;
   let playerId: string | null = null;
   let dropMove = false;
+  let nextMoveDelayMs = 0;
   let overviewFailed = false;
   let overviewReads = 0;
   let nonAdminLogin = false;
@@ -133,6 +134,11 @@ export async function createEventServer(page: Page) {
         if (overviewFailed)
           return route.fulfill({ status: 503, headers, json: { error: '测试刷新失败' } });
       }
+      if (body.action === 'move' && nextMoveDelayMs > 0) {
+        const delay = nextMoveDelayMs;
+        nextMoveDelayMs = 0;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
       const response = await handler(
         new Request('https://test/competition', {
           method: 'POST',
@@ -201,6 +207,9 @@ export async function createEventServer(page: Page) {
     close: () => db.close(),
     dropNextMove: () => {
       dropMove = true;
+    },
+    delayNextMove: (ms: number) => {
+      nextMoveDelayMs = ms;
     },
     failOverview: (value: boolean) => {
       overviewFailed = value;

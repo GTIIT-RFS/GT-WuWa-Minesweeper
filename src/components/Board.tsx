@@ -10,6 +10,7 @@ export function Board({
   flagMode,
   urls,
   settings,
+  pendingMove = null,
 }: {
   game: Game;
   onReveal: (i: number) => void;
@@ -17,6 +18,7 @@ export function Board({
   flagMode: boolean;
   urls: Record<string, string>;
   settings: Settings;
+  pendingMove?: { index: number; kind: 'reveal' | 'flag'; retry: boolean } | null;
 }) {
   const ended = !['ready', 'playing'].includes(game.status);
   return (
@@ -30,6 +32,29 @@ export function Board({
           const row = Math.floor(i / game.config.cols) + 1,
             col = (i % game.config.cols) + 1;
           const wrong = ended && cell.flagged && !cell.mine;
+          const isPending = pendingMove?.index === i;
+          const pendingClass =
+            isPending && pendingMove
+              ? [
+                  'pending-action',
+                  `pending-${pendingMove.kind}`,
+                  pendingMove.retry ? 'pending-retry' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+              : '';
+          const pendingSuffix =
+            isPending && pendingMove ? (pendingMove.retry ? '，待重试' : '，等待服务器确认') : '';
+          const cellClass = [
+            'cell',
+            cell.revealed ? 'open' : '',
+            game.hit === i ? 'hit' : '',
+            `n${cell.adjacent}`,
+            wrong ? 'wrong' : '',
+            pendingClass,
+          ]
+            .filter(Boolean)
+            .join(' ');
           const label = cell.revealed
             ? cell.mine
               ? '土豆'
@@ -40,9 +65,9 @@ export function Board({
           return (
             <button
               key={i}
-              className={`cell ${cell.revealed ? 'open' : ''} ${game.hit === i ? 'hit' : ''} n${cell.adjacent} ${wrong ? 'wrong' : ''}`}
-              aria-label={`第${row}行第${col}列，${label}`}
-              aria-disabled={ended || cell.revealed}
+              className={cellClass}
+              aria-label={`第${row}行第${col}列，${label}${pendingSuffix}`}
+              aria-disabled={ended || cell.revealed || isPending}
               onClick={() => (flagMode ? onFlag(i) : onReveal(i))}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -76,6 +101,11 @@ export function Board({
                   <span className="cell-mark">✦</span>
                 )}
                 {wrong && <span className="wrong-mark">×</span>}
+                {isPending && pendingMove && (
+                  <span className="cell-pending-indicator" aria-hidden="true">
+                    {pendingMove.kind === 'flag' ? '⚑' : '…'}
+                  </span>
+                )}
               </span>
             </button>
           );
