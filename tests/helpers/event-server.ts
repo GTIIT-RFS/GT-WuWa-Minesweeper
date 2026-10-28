@@ -158,6 +158,26 @@ export async function createEventServer(page: Page) {
     }
     return route.fulfill({ status: 404, headers, json: { error: 'Unexpected test endpoint' } });
   });
+  async function api(body: Record<string, unknown>, id = randomUUID(), isAnonymous = true) {
+    await db.query(
+      'insert into auth.users(id,is_anonymous) values($1,$2) on conflict(id) do nothing',
+      [id, isAnonymous],
+    );
+    const token = `stress-${randomUUID()}`;
+    tokens.set(token, { id, isAnonymous });
+    const response = await handler(
+      new Request('https://test/competition', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    );
+    return {
+      status: response.status,
+      body: await response.json(),
+      headers: response.headers,
+    };
+  }
   async function seedWin(name: string, elapsed = 2000, owner?: string, roundNo = 1) {
     const id = owner ?? randomUUID();
     if (!owner) await db.query('insert into auth.users values($1,true)', [id]);
@@ -215,6 +235,7 @@ export async function createEventServer(page: Page) {
       overviewFailed = value;
     },
     getOverviewReads: () => overviewReads,
+    api,
     getSignupCount: () => signupCount,
     getPlayer: () => playerId,
     nonAdminStaff: () => {
