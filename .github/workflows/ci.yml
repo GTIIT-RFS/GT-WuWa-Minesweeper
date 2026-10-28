@@ -10,15 +10,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Temporary format inspection
-        run: |
-          files="supabase/functions/_shared/auth.test.ts supabase/functions/_shared/auth.ts supabase/functions/_shared/http.test.ts supabase/functions/_shared/http.ts tests/online-concurrency.spec.ts"
-          npx prettier --write $files
-          for file in $files; do
-            printf '\\n__FORMAT_BEGIN__%s__\\n' "$file"
-            cat "$file"
-            printf '\\n__FORMAT_END__%s__\\n' "$file"
-          done
       - run: npm run format:check
       - run: npm test
       - run: npm run build
