@@ -114,6 +114,20 @@ Deno.test('rejects expired asymmetric tokens without falling back to Auth', asyn
   });
 });
 
+Deno.test('forces an Auth lookup for sensitive account operations', async () => {
+  await withJwks(async (baseUrl, privateKey) => {
+    let lookups = 0;
+    const authenticate = createAuthenticator(baseUrl, async () => {
+      lookups++;
+      return { id: playerId, isAnonymous: false };
+    });
+    const token = await signedToken(baseUrl, privateKey);
+    const identity = await authenticate(token, { requireCurrentUser: true });
+    assertEquals(identity?.isAnonymous, false, 'fresh identity');
+    assertEquals(lookups, 1, 'sensitive-operation lookup calls');
+  });
+});
+
 Deno.test('uses Auth.getUser for legacy HS256 tokens', async () => {
   await withJwks(async (baseUrl) => {
     const secret = new TextEncoder().encode('legacy-test-secret-that-is-only-used-in-tests');
