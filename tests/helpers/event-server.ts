@@ -54,6 +54,12 @@ export async function createEventServer(page: Page) {
     commit: (round, state, request) =>
       rpc<Round>('commit_online_move', [round.id, round.player_id, round.revision, state, request]),
   };
+  const testGames: RoundRepository = {
+    start: (player, name, state) => rpc<Round>('event_test_start', [player, name, state]),
+    get: (id, player) => rpc<Round | null>('event_get_round', [id, player]),
+    commit: (round, state, request) =>
+      rpc<Round>('event_test_commit', [round.id, round.player_id, round.revision, state, request]),
+  };
   const events: EventRepository = {
     overview: (player) => rpc('event_overview', [player]),
     board: (kind, stage, player, page) => rpc('event_board', [kind, stage, player, page]),
@@ -61,12 +67,19 @@ export async function createEventServer(page: Page) {
     adminRead: (player, page) => rpc('event_admin_read', [player, page]),
     adminAction: (player, request, action, payload) =>
       rpc('event_admin_action', [player, request, action, payload]),
+    testOverview: (player) => rpc('event_test_overview', [player]),
+    testBoard: (kind, stage, player, page) => rpc('event_test_board', [kind, stage, player, page]),
+    testAwards: (player) => rpc('event_test_awards', [player]),
+    testAdminSettle: (player, request) => rpc('event_test_admin_settle', [player, request]),
+    testAdminAction: (player, request, action, payload) =>
+      rpc('event_test_admin_action', [player, request, action, payload]),
   };
   const handler = createCompetitionHandler(
     async (token) => tokens.get(token) ?? null,
     games,
     () => 0,
     events,
+    testGames,
   );
   function session(id: string, isAnonymous: boolean) {
     const expires = Math.floor(Date.now() / 1000) + 3600;
@@ -144,7 +157,7 @@ export async function createEventServer(page: Page) {
     if (!owner) await db.query('insert into auth.users values($1,true)', [id]);
     const stage = (
       await rows<{ id: string; starts_at: string }>(
-        'select id,starts_at from public.event_stages where round_no=$1',
+        "select id,starts_at from public.event_stages where competition_id='club-night-v1' and round_no=$1",
         [roundNo],
       )
     )[0];

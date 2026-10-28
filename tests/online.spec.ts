@@ -197,3 +197,17 @@ test('a non-admin permanent account cannot access the management controls', asyn
   await expect(page.getByRole('button', { name: '确认领奖', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '紧急暂停比赛' })).toHaveCount(0);
 });
+
+test('opens a long-lived isolated online test stage without opening the formal event', async ({
+  page,
+  eventServer,
+}) => {
+  await page.goto('/#online-test');
+  await expect(page.getByRole('heading', { name: '独立在线测试场' })).toBeVisible();
+  await expect(page.getByText(/不计入正式赛/).first()).toBeVisible();
+  await expect(page.getByText('测试场长期开放 · 不计入正式赛')).toBeVisible();
+  await page.getByLabel('公开参赛昵称').fill('网页测试玩家');
+  await page.getByRole('button', { name: '开始测试对局' }).click();
+  await expect(page.getByText('网页测试玩家', { exact: false })).toBeVisible();
+  expect(eventServer.getSignupCount()).toBe(1);
+});

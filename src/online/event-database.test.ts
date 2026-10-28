@@ -62,18 +62,22 @@ beforeAll(async () => {
 }, 30000);
 afterAll(() => db.close());
 it('installs an additive upgrade and keeps the event closed until a date is configured', async () => {
-  expect(await rows('select * from public.online_competitions')).toHaveLength(1);
+  expect(
+    await rows("select * from public.online_competitions where id='club-night-v1'"),
+  ).toHaveLength(1);
   await expect(start()).rejects.toThrow(/event not open/);
   await db.query('insert into public.event_admins(user_id) values ($1)', [admin]);
   await adminAction('configure', { date: '2030-06-01' });
   const stages = await rows<{ starts_at: string; ends_at: string }>(
-    'select * from public.event_stages order by round_no',
+    "select * from public.event_stages where competition_id='club-night-v1' order by round_no",
   );
   expect(stages).toHaveLength(4);
   expect(new Date(stages[0].starts_at).toISOString()).toBe('2030-06-01T10:00:00.000Z');
   expect(new Date(stages[3].ends_at).toISOString()).toBe('2030-06-01T14:00:00.000Z');
   const fourth = (
-    await rows<{ id: string }>('select id from public.event_stages where round_no=4')
+    await rows<{ id: string }>(
+      "select id from public.event_stages where competition_id='club-night-v1' and round_no=4",
+    )
   )[0].id;
   await adminAction('prizes', { stageId: fourth, count: 3 });
   await expect(adminAction('prizes', { stageId: fourth, count: 21 })).rejects.toThrow(
@@ -127,7 +131,9 @@ it('enforces 18:00 open and 18:57 new-game cutoff using the database clock', asy
 
 it('preserves each win, only improves a stage best and prepares multiple ranked candidates', async () => {
   const firstStage = (
-    await rows<{ id: string }>('select id from public.event_stages where round_no=1')
+    await rows<{ id: string }>(
+      "select id from public.event_stages where competition_id='club-night-v1' and round_no=1",
+    )
   )[0].id;
   expect(
     await rows('select * from public.event_bests where stage_id=$1', [firstStage]),
@@ -366,4 +372,94 @@ it('rolls a waived gift to the next eligible rank without rewriting any snapshot
   await expect(adminAction('prizes', { stageId: award.stage_id, count: 6 })).rejects.toThrow(
     /frozen/,
   );
+});
+
+it('keeps test games, settlement, credentials and claims isolated from the official event', async () => {
+  const initialTest = await rpc<{
+    event: { id: string };
+    state: string;
+    currentStage: { id: string };
+  }>('event_test_overview', [player]);
+  expect(initialTest.state).toBe('open');
+  expect(initialTest.event.id).toMatch(/^club-night-test-/);
+  expect((await rpc('event_overview', [player])).state).toBe('ended');
+
+  const testGame = await rpc<{
+    id: string;
+    player_id: string;
+    revision: number;
+    stage_id: string;
+    state: ReturnType<typeof newOnlineGame>;
+  }>('event_test_start', [player, '测试隔离玩家', newOnlineGame()]);
+  const win = await rpc<{ state: { status: string } }>('event_test_commit', [
+    testGame.id,
+    player,
+    testGame.revision,
+    { ...testGame.state, status: 'won' },
+    randomUUID(),
+  ]);
+  expect(win.state.status).toBe('won');
+
+  const live = await rpc<{ entries: { display_name: string }[] }>('event_test_board', [
+    'live',
+    testGame.stage_id,
+    player,
+    0,
+  ]);
+  expect(live.entries.map((x) => x.display_name)).toContain('测试隔离玩家');
+  const formalBefore = await rpc<{ stages: { id: string }[]; awards: { display_name: string }[] }>(
+    'event_overview',
+    [player],
+  );
+  expect(formalBefore.stages.some((x) => x.id === testGame.stage_id)).toBe(false);
+  expect(formalBefore.awards.some((x) => x.display_name === '测试隔离玩家')).toBe(false);
+
+  const settleRequest = randomUUID();
+  const settled = await rpc<{ ok: boolean; settledCount: number; nextCompetitionId: string }>(
+    'event_test_admin_settle',
+    [admin, settleRequest],
+  );
+  expect(settled).toMatchObject({ ok: true, settledCount: 1 });
+  expect(await rpc('event_test_admin_settle', [admin, settleRequest])).toMatchObject({
+    ok: true,
+    replayed: true,
+  });
+  expect(settled.nextCompetitionId).not.toBe(initialTest.event.id);
+
+  const testAwards = await rpc<
+    { id: string; token: string; status: string; display_name: string }[]
+  >('event_test_awards', [player]);
+  const testAward = testAwards.find((x) => x.display_name === '测试隔离玩家');
+  expect(testAward).toMatchObject({ status: 'pending' });
+  expect(testAward?.token).toBeTruthy();
+
+  const claimRequest = randomUUID();
+  expect(
+    await rpc('event_test_admin_action', [
+      admin,
+      claimRequest,
+      'claim',
+      {
+        awardId: testAward!.id,
+        credential: testAward!.token,
+        participantRef: 'TEST-STICKER-01',
+        verifiedInPerson: true,
+      },
+    ]),
+  ).toMatchObject({ ok: true });
+  expect(
+    await rows<{ competition_id: string }>(
+      'select competition_id from public.event_claims where award_id=$1',
+      [testAward!.id],
+    ),
+  ).toEqual([{ competition_id: initialTest.event.id }]);
+
+  const formalAfter = await rpc<{ awards: { display_name: string }[] }>('event_overview', [player]);
+  expect(formalAfter.awards.some((x) => x.display_name === '测试隔离玩家')).toBe(false);
+  const nextTest = await rpc<{ state: string; currentStage: { id: string } }>(
+    'event_test_overview',
+    [player],
+  );
+  expect(nextTest.state).toBe('open');
+  expect(nextTest.currentStage.id).not.toBe(testGame.stage_id);
 });

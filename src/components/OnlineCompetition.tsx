@@ -16,11 +16,13 @@ export function OnlineCompetition({
   urls,
   sound,
   onExplosion,
+  testMode = false,
 }: {
   settings: Settings;
   urls: Record<string, string>;
   sound: (key: SoundKey) => void;
   onExplosion: () => void;
+  testMode?: boolean;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [name, setName] = useState('');
@@ -71,7 +73,7 @@ export function OnlineCompetition({
         });
         setSession(restored);
       }
-      const next = await competitionRequest(body);
+      const next = await competitionRequest(body, testMode);
       const previous = round?.game.status;
       receivedAt.current = performance.now();
       setElapsed(next.elapsedMs);
@@ -128,8 +130,22 @@ export function OnlineCompetition({
     <div className="online-layout">
       <section className="panel online-game">
         <span className="eyebrow">SHARED CHALLENGE / 在线比赛</span>
-        <h1>一起排雷，全场竞速。</h1>
-        <p>8 × 8 · 10 雷 · 180 秒。服务器发出对局即开始计时，包含网络往返时间。允许多次挑战。</p>
+        <h1>{testMode ? '独立在线测试场' : '一起排雷，全场竞速。'}</h1>
+        <p>
+          {testMode
+            ? '测试模式长期开放，用于验证在线对局、服务器计时、测试排行榜与测试领奖流程。'
+            : '8 × 8 · 10 雷 · 180 秒。服务器发出对局即开始计时，包含网络往返时间。允许多次挑战。'}
+        </p>
+        {testMode && (
+          <p className="test-mode-notice">
+            测试成绩、排名、结算与领奖记录均独立保存，不会进入正式排行榜或产生正式领奖资格。
+          </p>
+        )}
+        <p>
+          <a href={testMode ? '#online' : '#online-test'}>
+            {testMode ? '返回正式比赛 ↗' : '进入独立在线测试场 ↗'}
+          </a>
+        </p>
         <p className="muted">
           输入昵称即可匿名参赛，无需邮箱、手机号或密码。清除浏览器数据或更换设备可能丢失匿名身份；请保留当前浏览器领奖。
         </p>
@@ -142,7 +158,9 @@ export function OnlineCompetition({
           <>
             <div className="online-toolbar">
               <span>{session ? '匿名会话已恢复' : '尚未建立匿名会话'}</span>
-              <a href="#awards">我的领奖凭证</a>
+              <a href={testMode ? '#test-awards' : '#awards'}>
+                {testMode ? '我的测试领奖凭证' : '我的领奖凭证'}
+              </a>
             </div>
             {!active && !pending && (
               <form
@@ -171,7 +189,13 @@ export function OnlineCompetition({
                     !['open', 'closing'].includes(overview.state)
                   }
                 >
-                  {overview?.state === 'closing' ? '恢复当前对局' : '开始在线挑战'}
+                  {testMode
+                    ? overview?.state === 'closing'
+                      ? '恢复测试对局'
+                      : '开始测试对局'
+                    : overview?.state === 'closing'
+                      ? '恢复当前对局'
+                      : '开始在线挑战'}
                 </button>
               </form>
             )}
@@ -276,7 +300,7 @@ export function OnlineCompetition({
           </div>
         )}
       </section>
-      <OnlineLeaderboard onOverview={setOverview} />
+      <OnlineLeaderboard onOverview={setOverview} testMode={testMode} />
     </div>
   );
 }

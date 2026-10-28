@@ -22,6 +22,7 @@ export function createCompetitionHandler(
   repository: RoundRepository,
   random: () => number,
   events?: EventRepository,
+  testRepository?: RoundRepository,
 ) {
   return async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -65,6 +66,27 @@ export function createCompetitionHandler(
       if (!Number.isInteger(page) || (page as number) < 0 || (page as number) > 10000)
         throw new ApiError(400, '无效页码。');
       // Public results do not create anonymous accounts. A supplied userId is always ignored.
+      if (input.action === 'test_overview') {
+        if (!events) throw new ApiError(503, '测试服务尚未升级。');
+        return json(await events.testOverview(player));
+      }
+      if (input.action === 'test_board') {
+        if (!events) throw new ApiError(503, '测试服务尚未升级。');
+        if (
+          !['live', 'history', 'evening'].includes(input.kind as string) ||
+          (input.stageId != null &&
+            (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
+        )
+          throw new ApiError(400, '无效测试排行榜。');
+        return json(
+          await events.testBoard(
+            input.kind as string,
+            (input.stageId as string) ?? null,
+            player,
+            page as number,
+          ),
+        );
+      }
       if (input.action === 'overview') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
         return json(await events.overview(player));
@@ -87,9 +109,41 @@ export function createCompetitionHandler(
         );
       }
       if (!player) throw new ApiError(401, '匿名身份已失效，请重新连接；不要清除浏览器数据。');
-      if (input.action === 'awards') {
+      if (input.action === 'awards' || input.action === 'test_awards') {
         if (!events) throw new ApiError(503, '领奖服务尚未升级。');
-        return json(await events.awards(player));
+        return json(
+          input.action === 'test_awards'
+            ? await events.testAwards(player)
+            : await events.awards(player),
+        );
+      }
+      if (input.action === 'test_start' || input.action === 'test_move') {
+        if (!testRepository) throw new ApiError(503, '在线测试服务尚未升级。');
+        const mapped = { ...input, action: input.action === 'test_start' ? 'start' : 'move' };
+        return json(await handleCompetition(mapped, player, testRepository, Date.now(), random));
+      }
+      if (input.action === 'test_admin_settle' || input.action === 'test_admin_action') {
+        if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');
+        if (!events) throw new ApiError(503, '测试管理服务尚未升级。');
+        if (typeof input.requestId !== 'string' || !uuid.test(input.requestId))
+          throw new ApiError(400, '无效管理请求编号。');
+        if (input.action === 'test_admin_settle')
+          return json(await events.testAdminSettle(player, input.requestId));
+        if (
+          !['claim', 'status', 'rollover'].includes(input.operation as string) ||
+          !input.payload ||
+          typeof input.payload !== 'object' ||
+          Array.isArray(input.payload)
+        )
+          throw new ApiError(400, '无效测试管理操作。');
+        return json(
+          await events.testAdminAction(
+            player,
+            input.requestId,
+            input.operation as string,
+            input.payload as Record<string, unknown>,
+          ),
+        );
       }
       if (input.action === 'admin_read' || input.action === 'admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');

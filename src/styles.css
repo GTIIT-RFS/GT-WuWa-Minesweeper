@@ -2033,3 +2033,27 @@ summary {
 .reduce-motion .winner-reveal {
   animation: none;
 }
+
+/* Visually separate non-prize test operations from the official event. */
+.test-mode-notice {
+  border-left: 3px solid var(--mint, #8fe3d4);
+  padding: 0.75rem 1rem;
+  background: rgba(143, 227, 212, 0.08);
+  color: var(--text, #dce8e7);
+}
+.test-mode-admin,
+.test-claim-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(143, 227, 212, 0.28);
+  border-radius: 0.75rem;
+  background: rgba(143, 227, 212, 0.045);
+}
+.test-mode-admin h3,
+.test-claim-panel h2 {
+  margin-top: 0;
+}
+.test-claim-panel form {
+  display: grid;
+  gap: 0.8rem;
+}

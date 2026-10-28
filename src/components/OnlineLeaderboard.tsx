@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { readOverview, readBoard, supabase } from '../online/client';
+import {
+  readOverview,
+  readBoard,
+  readTestOverview,
+  readTestBoard,
+  supabase,
+} from '../online/client';
 import { awardLabels, beijing, countdown } from '../online/presentation';
 import type {
   EventOverview,
@@ -11,9 +17,11 @@ const empty: EventBoard = { entries: [], mine: null, total: 0 };
 export function OnlineLeaderboard({
   display = false,
   onOverview,
+  testMode = false,
 }: {
   display?: boolean;
   onOverview?: (data: EventOverview) => void;
+  testMode?: boolean;
 }) {
   const [data, setData] = useState<EventOverview | null>(null);
   const [error, setError] = useState('');
@@ -30,13 +38,13 @@ export function OnlineLeaderboard({
   const inFlight = useRef(false);
   const mounted = useRef(false);
   const seen = useRef(new Set<string>());
-  const joinUrl = `${location.origin}${location.pathname}#online`;
+  const joinUrl = `${location.origin}${location.pathname}${testMode ? '#online-test' : '#online'}`;
   const refresh = useCallback(async () => {
     if (inFlight.current || !supabase) return;
     inFlight.current = true;
     setLoading(true);
     try {
-      const next = await readOverview();
+      const next = testMode ? await readTestOverview() : await readOverview();
       if (!next?.serverNow || !Array.isArray(next.stages))
         throw new Error('比赛服务版本不匹配，请联系工作人员升级。');
       if (!mounted.current) return;
@@ -56,7 +64,7 @@ export function OnlineLeaderboard({
       inFlight.current = false;
       if (mounted.current) setLoading(false);
     }
-  }, [display, onOverview]);
+  }, [display, onOverview, testMode]);
   useEffect(() => {
     mounted.current = true;
     let stopped = false;
@@ -103,7 +111,8 @@ export function OnlineLeaderboard({
   useEffect(() => {
     if ((kind !== 'history' || !selected) && !(kind === 'evening' && historyPage > 0)) return;
     let stopped = false;
-    void readBoard(kind, kind === 'history' ? selected : null, historyPage)
+    const read = testMode ? readTestBoard : readBoard;
+    void read(kind, kind === 'history' ? selected : null, historyPage)
       .then((board) => {
         if (!stopped) setHistory({ key: `${kind}:${selected}:${historyPage}`, board });
       })
@@ -113,7 +122,7 @@ export function OnlineLeaderboard({
     return () => {
       stopped = true;
     };
-  }, [kind, selected, historyPage, data?.serverNow]);
+  }, [kind, selected, historyPage, data?.serverNow, testMode]);
   const board =
     kind === 'history' || (kind === 'evening' && historyPage > 0)
       ? history?.key === historyKey
@@ -130,24 +139,39 @@ export function OnlineLeaderboard({
   const stage = data?.currentStage;
   const nextStage = data?.stages.find((s) => Date.parse(s.starts_at) > serverMs);
   const deadline = stage?.ends_at ?? nextStage?.starts_at;
-  const labels = {
-    unconfigured: '活动日期尚未配置',
-    upcoming: '等待开赛',
-    open: '本轮开放中',
-    closing: '已停止开新局 · 已开始对局可继续',
-    paused: '紧急暂停 · 计时继续',
-    ended: '整晚比赛已结束',
-  };
+  const labels = testMode
+    ? {
+        unconfigured: '测试场初始化中',
+        upcoming: '测试场准备中',
+        open: '测试场长期开放 · 不计入正式赛',
+        closing: '测试轮次即将结算',
+        paused: '测试场暂停',
+        ended: '测试轮次已结束',
+      }
+    : {
+        unconfigured: '活动日期尚未配置',
+        upcoming: '等待开赛',
+        open: '本轮开放中',
+        closing: '已停止开新局 · 已开始对局可继续',
+        paused: '紧急暂停 · 计时继续',
+        ended: '整晚比赛已结束',
+      };
   const currentAwards = data?.awards.filter((a) => a.stage_id === selected) ?? [];
   return (
     <section className={`panel online-leaderboard ${display ? 'projection' : ''}`}>
       <span className="eyebrow">GT WUWA · CLUB NIGHT / 匿名竞速赛</span>
       <div className="event-title-row">
         <div>
-          <h1>{display ? '土豆扫雷 · 全场排行榜' : '匿名竞速排行榜'}</h1>
-          <p>8 × 8 · 10 雷 · 180 秒 · 首格安全 · 每轮独立最佳成绩</p>
+          <h1>
+            {testMode ? '在线测试排行榜' : display ? '土豆扫雷 · 全场排行榜' : '匿名竞速排行榜'}
+          </h1>
+          <p>
+            {testMode
+              ? '8 × 8 · 10 雷 · 180 秒 · 独立测试成绩，不计入正式赛'
+              : '8 × 8 · 10 雷 · 180 秒 · 首格安全 · 每轮独立最佳成绩'}
+          </p>
         </div>
-        {deadline && (
+        {deadline && !testMode && (
           <div className="stage-countdown">
             <small>{stage ? '距本轮结算' : '距下一轮开放'}</small>
             <strong>{countdown(Date.parse(deadline) - serverMs)}</strong>
@@ -162,16 +186,16 @@ export function OnlineLeaderboard({
             <strong>{data ? labels[data.state] : '正在读取服务器赛程…'}</strong>
             {stage && (
               <span>
-                第 {stage.round_no} 轮 · 北京时间 {beijing(stage.starts_at, true)}–
-                {beijing(stage.ends_at)}
+                {testMode ? '测试轮次' : `第 ${stage.round_no} 轮`} · 北京时间{' '}
+                {beijing(stage.starts_at, true)}–{beijing(stage.ends_at)}
               </span>
             )}
           </div>
           <div className="event-schedule">
             {data?.stages.map((s) => (
               <span key={s.id} className={s.id === stage?.id ? 'current-stage' : ''}>
-                第{s.round_no}轮 {beijing(s.starts_at)}–{beijing(s.ends_at)}{' '}
-                {s.settled_at ? '已结算' : ''}
+                {testMode ? '测试轮次' : `第${s.round_no}轮`} {beijing(s.starts_at)}–
+                {beijing(s.ends_at)} {s.settled_at ? '已结算' : ''}
               </span>
             ))}
           </div>
@@ -236,7 +260,13 @@ export function OnlineLeaderboard({
               ))}
             </div>
           )}
-          {!board.entries.length && data && <p>暂无有效成绩。只有本轮服务端确认的通关才能入榜。</p>}
+          {!board.entries.length && data && (
+            <p>
+              {testMode
+                ? '暂无有效测试成绩。只有测试场服务端确认的通关才能入榜。'
+                : '暂无有效成绩。只有本轮服务端确认的通关才能入榜。'}
+            </p>
+          )}
           {board.mine && (
             <p className="personal-rank" role="status">
               你的排名 #{board.mine.rank} · {board.mine.display_name} ·{' '}
@@ -279,7 +309,11 @@ export function OnlineLeaderboard({
             </div>
           )}
           {kind === 'evening' && (
-            <p className="muted">整晚总榜只作荣誉展示，各轮礼品以冻结排名和现场核验为准。</p>
+            <p className="muted">
+              {testMode
+                ? '测试总榜汇总所有测试轮次，不影响正式排名与领奖。'
+                : '整晚总榜只作荣誉展示，各轮礼品以冻结排名和现场核验为准。'}
+            </p>
           )}
           {data?.state === 'ended' && (
             <div className="public-awards">
@@ -292,7 +326,7 @@ export function OnlineLeaderboard({
             </div>
           )}
           <small className="muted">
-            服务器校时 · 每 {display ? 5 : 10} 秒刷新 ·{' '}
+            {testMode ? '独立测试场 · ' : ''}服务器校时 · 每 {display ? 5 : 10} 秒刷新 ·{' '}
             {data ? `北京时间 ${beijing(data.serverNow, true)}` : '连接中'}
           </small>
         </>

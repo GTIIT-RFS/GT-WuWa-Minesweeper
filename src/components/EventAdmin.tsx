@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { adminRequest, readAdmin, staffSupabase } from '../online/client';
+import {
+  adminRequest,
+  readAdmin,
+  staffSupabase,
+  testAdminSettle,
+  testAdminAction,
+} from '../online/client';
 import type { AdminData } from '../../supabase/functions/_shared/event-types';
 import { awardLabels, beijing, csvCell } from '../online/presentation';
 function localInput(value: string): string {
@@ -22,7 +28,11 @@ function formValues(form: HTMLFormElement) {
 export function EventAdmin() {
   const [claimPrefill] = useState(() => {
     const query = new URLSearchParams(location.hash.split('?')[1]);
-    return { awardId: query.get('award') ?? '', credential: query.get('credential') ?? '' };
+    return {
+      awardId: query.get('award') ?? '',
+      credential: query.get('credential') ?? '',
+      testMode: query.get('test') === '1',
+    };
   });
   useEffect(() => {
     if (location.hash.startsWith('#event-admin?'))
@@ -99,7 +109,12 @@ export function EventAdmin() {
     setError('');
     setMessage('');
     try {
-      const result = await adminRequest(task.operation, task.payload, task.requestId);
+      const result =
+        task.operation === 'test_settle'
+          ? await testAdminSettle(task.requestId)
+          : task.operation.startsWith('test:')
+            ? await testAdminAction(task.operation.slice(5), task.payload, task.requestId)
+            : await adminRequest(task.operation, task.payload, task.requestId);
       setPending(null);
       setMessage(
         result.replayed ? '已确认上次操作结果，未重复执行。' : '操作已由服务器确认并记入审计。',
@@ -244,7 +259,16 @@ export function EventAdmin() {
                   <button disabled={disabled} onClick={() => action('settle', {})}>
                     补执行到期轮次结算
                   </button>
-                  <p>只处理已到截止时间且未结算的轮次；冻结结果不会重算。</p>
+                  <p>只处理已到截止时间且未结算的正式轮次；冻结结果不会重算。</p>
+                  <div className="test-mode-admin">
+                    <h3>独立在线测试场</h3>
+                    <p>
+                      测试场长期开放。此操作只结算测试轮次、生成测试排名与测试凭证，并立即开启新测试轮次；不会修改正式赛程或正式领奖记录。
+                    </p>
+                    <button disabled={disabled} onClick={() => action('test_settle', {})}>
+                      立即结算测试轮次并开启新一轮
+                    </button>
+                  </div>
                 </section>
                 <section>
                   <h2>四轮赛程与名额</h2>
@@ -378,7 +402,53 @@ export function EventAdmin() {
                   </tbody>
                 </table>
               </div>
-              <div className="admin-grid">
+              {claimPrefill.testMode && (
+                <section className="panel test-claim-panel">
+                  <h2>测试领奖核验（不发放实物）</h2>
+                  <p className="test-mode-notice">
+                    只用于测试凭证核验与防重复领取逻辑。请勿录入真实姓名、学号、手机号或其他个人敏感信息。
+                  </p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const f = formValues(e.currentTarget);
+                      action('test:claim', {
+                        awardId: f.awardId,
+                        credential: f.credential,
+                        participantRef: f.participantRef,
+                        verifiedInPerson: f.verified === 'yes',
+                      });
+                    }}
+                  >
+                    <label>
+                      测试获奖记录
+                      <input name="awardId" defaultValue={claimPrefill.awardId} required />
+                    </label>
+                    <label>
+                      一次性测试凭证
+                      <input
+                        name="credential"
+                        defaultValue={claimPrefill.credential}
+                        autoComplete="off"
+                        maxLength={100}
+                        required
+                      />
+                    </label>
+                    <label>
+                      测试参与编号
+                      <input name="participantRef" autoComplete="off" maxLength={64} required />
+                    </label>
+                    <label className="checkbox-label">
+                      <input type="checkbox" name="verified" value="yes" required />
+                      已确认这是测试记录，不代表真实现场核验
+                    </label>
+                    <button className="primary" disabled={disabled}>
+                      确认测试领取
+                    </button>
+                  </form>
+                </section>
+              )}
+              <div className="admin-grid" hidden={claimPrefill.testMode}>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -536,7 +606,9 @@ export function EventAdmin() {
           </button>
         </div>
       )}
-      <a href="#online">返回参赛与榜单</a>
+      <a href={claimPrefill.testMode ? '#online-test' : '#online'}>
+        {claimPrefill.testMode ? '返回在线测试场' : '返回参赛与榜单'}
+      </a>
     </section>
   );
 }

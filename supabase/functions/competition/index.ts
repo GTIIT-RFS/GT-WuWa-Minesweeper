@@ -54,6 +54,29 @@ async function call(name: string, args: Record<string, unknown>) {
   dbError(error);
   return data;
 }
+const testRepository: RoundRepository = {
+  async start(player, name, state) {
+    const { data, error } = await server.rpc('event_test_start', {
+      p_player: player,
+      p_name: name,
+      p_state: state,
+    });
+    dbError(error);
+    return data as Round;
+  },
+  get: repository.get,
+  async commit(round, state, requestId) {
+    const { data, error } = await server.rpc('event_test_commit', {
+      p_round: round.id,
+      p_player: round.player_id,
+      p_revision: round.revision,
+      p_state: state,
+      p_request: requestId,
+    });
+    dbError(error);
+    return data as Round;
+  },
+};
 const events: EventRepository = {
   overview: (player) => call('event_overview', { p_player: player }),
   board: (kind, stage, player, page) =>
@@ -62,6 +85,19 @@ const events: EventRepository = {
   adminRead: (player, page) => call('event_admin_read', { p_actor: player, p_page: page }),
   adminAction: (player, request, operation, payload) =>
     call('event_admin_action', {
+      p_actor: player,
+      p_request: request,
+      p_action: operation,
+      p_payload: payload,
+    }),
+  testOverview: (player) => call('event_test_overview', { p_player: player }),
+  testBoard: (kind, stage, player, page) =>
+    call('event_test_board', { p_kind: kind, p_stage: stage, p_player: player, p_page: page }),
+  testAwards: (player) => call('event_test_awards', { p_player: player }),
+  testAdminSettle: (player, request) =>
+    call('event_test_admin_settle', { p_actor: player, p_request: request }),
+  testAdminAction: (player, request, operation, payload) =>
+    call('event_test_admin_action', {
       p_actor: player,
       p_request: request,
       p_action: operation,
@@ -81,5 +117,6 @@ Deno.serve(
     repository,
     () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
     events,
+    testRepository,
   ),
 );

@@ -37,7 +37,25 @@ export interface OnlineScore {
 export const readOverview = () => eventRequest<EventOverview>({ action: 'overview' });
 export const readBoard = (kind: string, stageId: string | null, page = 0) =>
   eventRequest<EventBoard>({ action: 'board', kind, stageId, page });
+export const readTestOverview = () => eventRequest<EventOverview>({ action: 'test_overview' });
+export const readTestBoard = (kind: string, stageId: string | null, page = 0) =>
+  eventRequest<EventBoard>({ action: 'test_board', kind, stageId, page });
 export const readAwards = () => eventRequest<Award[]>({ action: 'awards' });
+export const readTestAwards = () => eventRequest<Award[]>({ action: 'test_awards' });
+export const testAdminSettle = (requestId: string) =>
+  eventRequest<{ ok: boolean; replayed?: boolean; settledCount?: number }>(
+    { action: 'test_admin_settle', requestId },
+    true,
+  );
+export const testAdminAction = (
+  operation: string,
+  payload: Record<string, unknown>,
+  requestId: string,
+) =>
+  eventRequest<{ ok: boolean; replayed?: boolean }>(
+    { action: 'test_admin_action', operation, payload, requestId },
+    true,
+  );
 export const readAdmin = (page = 0) =>
   eventRequest<AdminData>({ action: 'admin_read', page }, true);
 export const adminRequest = (
@@ -58,8 +76,15 @@ export type OnlineRequest =
       requestId: string;
       move: Move;
     };
-export async function competitionRequest(body: OnlineRequest): Promise<PublicRound> {
-  return eventRequest<PublicRound>(body);
+export async function competitionRequest(
+  body: OnlineRequest,
+  testMode = false,
+): Promise<PublicRound> {
+  if (!testMode) return eventRequest<PublicRound>(body);
+  return eventRequest<PublicRound>({
+    ...body,
+    action: body.action === 'start' ? 'test_start' : 'test_move',
+  });
 }
 export class RequestError extends Error {
   constructor(
