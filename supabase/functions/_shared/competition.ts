@@ -13,6 +13,9 @@ export interface Round {
   started_at: string;
   finished_at: string | null;
   last_request_id: string | null;
+  stage_id?: string | null;
+  server_now?: string;
+  deadline?: string;
 }
 export interface PublicRound {
   id: string;
@@ -21,9 +24,11 @@ export interface PublicRound {
   elapsedMs: number;
   limitMs: number;
   displayName: string;
+  stageId?: string | null;
+  serverNow?: string;
 }
 export type Move = { kind: 'reveal' | 'flag' | 'sync'; index?: number };
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -64,6 +69,7 @@ export function applyMove(round: Round, move: Move, now: number, random: () => n
     : toggleFlag(round.state, move.index!);
 }
 export function publicRound(round: Round, now: number): PublicRound {
+  const serverNow = round.server_now ? Date.parse(round.server_now) : now;
   const terminal = ['won', 'lost', 'timeout'].includes(round.state.status);
   return {
     id: round.id,
@@ -72,11 +78,14 @@ export function publicRound(round: Round, now: number): PublicRound {
       LIMIT_MS,
       Math.max(
         0,
-        Date.parse(round.finished_at ?? new Date(now).toISOString()) - Date.parse(round.started_at),
+        Date.parse(round.finished_at ?? new Date(serverNow).toISOString()) -
+          Date.parse(round.started_at),
       ),
     ),
     limitMs: LIMIT_MS,
     displayName: round.display_name,
+    stageId: round.stage_id,
+    serverNow: round.server_now,
     game: {
       ...round.state,
       cells: round.state.cells.map((cell) =>
@@ -116,7 +125,13 @@ export async function handleCompetition(
   if (!round) throw new ApiError(404, '对局不存在或不属于当前账号。');
   if (round.last_request_id === body.requestId || round.finished_at) return publicRound(round, now);
   if (round.revision !== body.revision) throw new ApiError(409, '对局已更新，请重新连接。');
-  const state = applyMove(round, move, now, random);
+  // Only a database timestamp controls expiry in deployed games; the fallback supports legacy fixtures.
+  const state = applyMove(
+    round,
+    move,
+    round.server_now ? Date.parse(round.server_now) : now,
+    random,
+  );
   const saved = await repository.commit(round, state, body.requestId);
   return publicRound(saved, now);
 }

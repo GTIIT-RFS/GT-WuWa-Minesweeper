@@ -23,11 +23,12 @@ function setup() {
     commit: vi.fn(),
   };
   const handler = createCompetitionHandler(
-    async (token) => (token === 'valid-email-session' ? 'verified-player' : null),
+    async (token) =>
+      token === 'valid-anonymous-session' ? { id: 'verified-player', isAnonymous: true } : null,
     repository,
     () => 0,
   );
-  const post = (body: string, token = 'valid-email-session') =>
+  const post = (body: string, token = 'valid-anonymous-session') =>
     handler(
       new Request('https://example.com/competition', {
         method: 'POST',
