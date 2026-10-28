@@ -649,20 +649,9 @@ h1 > span {
   color: var(--gold);
   font-size: 22px;
 }
-.cell.pending-action:not(.pending-retry) .cell-pending-indicator {
-  animation: pending-cell-pulse 650ms ease-in-out infinite alternate;
-}
 .cell.pending-retry .cell-pending-indicator {
   background: #2a2116d9;
   color: var(--gold);
-}
-@keyframes pending-cell-pulse {
-  from {
-    opacity: 0.55;
-  }
-  to {
-    opacity: 1;
-  }
 }
 .cell-content {
   position: relative;
