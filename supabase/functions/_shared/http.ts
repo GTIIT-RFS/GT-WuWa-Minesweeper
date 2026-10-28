@@ -50,7 +50,8 @@ export function createCompetitionHandler(
     };
     const timedTestRepository: RoundRepository | undefined = testRepository
       ? {
-          start: (player, name, state) => measureDb(() => testRepository.start(player, name, state)),
+          start: (player, name, state) =>
+            measureDb(() => testRepository.start(player, name, state)),
           get: (id, player) => measureDb(() => testRepository.get(id, player)),
           commit: (round, state, requestId) =>
             measureDb(() => testRepository.commit(round, state, requestId)),
@@ -102,7 +103,7 @@ export function createCompetitionHandler(
       if (!body || typeof body !== 'object' || Array.isArray(body))
         throw new ApiError(400, '无效请求。');
       const input = body as Record<string, unknown>;
-      const token = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i)?.[1];
+      const token = request.headers.get('Authorization')?.match(/^***;
       let identity: Identity | null = null;
       if (token && !token.startsWith('sb_publishable_')) {
         const authStartedAt = performance.now();

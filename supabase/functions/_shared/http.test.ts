@@ -36,7 +36,11 @@ const repository: RoundRepository = {
 };
 
 Deno.test('OPTIONS responses cache preflight and expose timing headers', async () => {
-  const handler = createCompetitionHandler(async () => null, repository, () => 0);
+  const handler = createCompetitionHandler(
+    async () => null,
+    repository,
+    () => 0,
+  );
   const response = await handler(new Request('https://test/competition', { method: 'OPTIONS' }));
   assert(response.status === 200, 'OPTIONS status must be 200');
   assertEquals(response.headers.get('access-control-max-age'), '600', 'preflight cache duration');
@@ -59,7 +63,7 @@ Deno.test('POST responses include non-sensitive server timing and a request id',
   const response = await handler(
     new Request('https://test/competition', {
       method: 'POST',
-      headers: { authorization: 'Bearer verified-test-token', 'content-type': 'application/json' },
+      headers: { authorization: '***', 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'start', name: 'Latency test' }),
     }),
   );
@@ -76,7 +80,11 @@ Deno.test('POST responses include non-sensitive server timing and a request id',
 });
 
 Deno.test('error responses retain timing diagnostics without exposing token data', async () => {
-  const handler = createCompetitionHandler(async () => null, repository, () => 0);
+  const handler = createCompetitionHandler(
+    async () => null,
+    repository,
+    () => 0,
+  );
   const response = await handler(
     new Request('https://test/competition', {
       method: 'POST',
@@ -86,5 +94,8 @@ Deno.test('error responses retain timing diagnostics without exposing token data
   );
   assert(response.status === 401, 'unauthenticated status must be 401');
   assert(response.headers.has('server-timing'), 'error response timing missing');
-  assert(!(await response.text()).includes('verified-test-token'), 'response leaked credential text');
+  assert(
+    !(await response.text()).includes('verified-test-token'),
+    'response leaked credential text',
+  );
 });

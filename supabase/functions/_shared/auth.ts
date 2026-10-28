@@ -26,8 +26,7 @@ function isJwksInfrastructureError(error: unknown): boolean {
     return true;
   }
   return (
-    error instanceof TypeError &&
-    /fetch|network|timeout/i.test(String(candidate.message ?? ''))
+    error instanceof TypeError && /fetch|network|timeout/i.test(String(candidate.message ?? ''))
   );
 }
 
@@ -39,10 +38,7 @@ function isJwksInfrastructureError(error: unknown): boolean {
 export function createAuthenticator(
   supabaseUrl: string,
   lookupUser: UserLookup,
-): (
-  token: string,
-  options?: { requireCurrentUser?: boolean },
-) => Promise<VerifiedIdentity | null> {
+): (token: string, options?: { requireCurrentUser?: boolean }) => Promise<VerifiedIdentity | null> {
   const baseUrl = new URL(supabaseUrl);
   const issuer = new URL('/auth/v1', baseUrl).toString();
   const jwks = createRemoteJWKSet(new URL('/auth/v1/.well-known/jwks.json', baseUrl));

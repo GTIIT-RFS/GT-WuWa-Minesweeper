@@ -19,18 +19,15 @@ async function withJwks(
   publicJwk.alg = 'ES256';
   publicJwk.use = 'sig';
 
-  const server = Deno.serve(
-    { hostname: '127.0.0.1', port: 0, onListen: () => {} },
-    (request) => {
-      if (new URL(request.url).pathname !== '/auth/v1/.well-known/jwks.json') {
-        return new Response('not found', { status: 404 });
-      }
-      return Response.json(
-        { keys: [publicJwk] },
-        { headers: { 'cache-control': 'public, max-age=600' } },
-      );
-    },
-  );
+  const server = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen: () => {} }, (request) => {
+    if (new URL(request.url).pathname !== '/auth/v1/.well-known/jwks.json') {
+      return new Response('not found', { status: 404 });
+    }
+    return Response.json(
+      { keys: [publicJwk] },
+      { headers: { 'cache-control': 'public, max-age=600' } },
+    );
+  });
   try {
     const address = server.addr;
     if (address.transport !== 'tcp') throw new Error('Expected a TCP test server');
