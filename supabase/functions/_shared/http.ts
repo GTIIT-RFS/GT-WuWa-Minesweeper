@@ -9,6 +9,8 @@ const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '600',
+  'Access-Control-Expose-Headers': 'Server-Timing, X-Request-Id',
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -26,7 +28,20 @@ export function createCompetitionHandler(
 ) {
   return async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
-    if (request.method !== 'POST') return json({ error: '仅支持 POST。' }, 405);
+    const startedAt = performance.now();
+    let authMs = 0;
+    const requestId = crypto.randomUUID();
+    const reply = (body: unknown, status = 200) => {
+      const totalMs = Math.max(0, performance.now() - startedAt);
+      const response = json(body, status);
+      response.headers.set(
+        'Server-Timing',
+        `auth;dur=${authMs.toFixed(1)}, app;dur=${Math.max(0, totalMs - authMs).toFixed(1)}, total;dur=${totalMs.toFixed(1)}`,
+      );
+      response.headers.set('X-Request-Id', requestId);
+      return response;
+    };
+    if (request.method !== 'POST') return reply({ error: '仅支持 POST。' }, 405);
     try {
       // Bound the stream before parsing, even for chunked requests without Content-Length.
       const reader = request.body?.getReader();
@@ -59,8 +74,15 @@ export function createCompetitionHandler(
         throw new ApiError(400, '无效请求。');
       const input = body as Record<string, unknown>;
       const token = request.headers.get('Authorization')?.match(/^Bearer (.+)$/i)?.[1];
-      const identity =
-        token && !token.startsWith('sb_publishable_') ? await authenticate(token) : null;
+      let identity: Identity | null = null;
+      if (token && !token.startsWith('sb_publishable_')) {
+        const authStartedAt = performance.now();
+        try {
+          identity = await authenticate(token);
+        } finally {
+          authMs += Math.max(0, performance.now() - authStartedAt);
+        }
+      }
       const player = identity?.id ?? null;
       const page = input.page === undefined ? 0 : input.page;
       if (!Number.isInteger(page) || (page as number) < 0 || (page as number) > 10000)
@@ -68,7 +90,7 @@ export function createCompetitionHandler(
       // Public results do not create anonymous accounts. A supplied userId is always ignored.
       if (input.action === 'test_overview') {
         if (!events) throw new ApiError(503, '测试服务尚未升级。');
-        return json(await events.testOverview(player));
+        return reply(await events.testOverview(player));
       }
       if (input.action === 'test_board') {
         if (!events) throw new ApiError(503, '测试服务尚未升级。');
