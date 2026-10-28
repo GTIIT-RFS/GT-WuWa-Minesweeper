@@ -20,32 +20,40 @@ beforeAll(async () => {
 }, 30_000);
 afterAll(() => db.close());
 
-it('adds a partial index for active-round lookup without indexing completed rounds', async () => {
-  const rows = await db.query<{ indexdef: string }>(
-    `select indexdef from pg_indexes where schemaname='public'
+it(
+  'adds a partial index for active-round lookup without indexing completed rounds',
+  async () => {
+    const rows = await db.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes where schemaname='public'
       and indexname='online_rounds_active_player_competition_idx'`,
-  );
-  expect(rows.rows).toHaveLength(1);
-  expect(rows.rows[0].indexdef).toContain('(player_id, competition_id, started_at DESC)');
-  expect(rows.rows[0].indexdef).toContain('WHERE (finished_at IS NULL)');
-});
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].indexdef).toContain(
+      '(player_id, competition_id, started_at DESC)',
+    );
+    expect(rows.rows[0].indexdef).toContain('WHERE (finished_at IS NULL)');
+  },
+);
 
-it('caches CORS preflight for a bounded period and keeps it credential-free', async () => {
-  const repository: RoundRepository = {
-    start: async () => {
-      throw new Error('not expected');
-    },
-    get: async () => null,
-    commit: async () => {
-      throw new Error('not expected');
-    },
-  };
-  const handler = createCompetitionHandler(async () => null, repository, () => 0);
-  const response = await handler(
-    new Request('https://example.com/competition', { method: 'OPTIONS' }),
-  );
-  expect(response.status).toBe(200);
-  expect(response.headers.get('Access-Control-Max-Age')).toBe('600');
-  expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
-  expect(response.headers.get('Access-Control-Allow-Credentials')).toBeNull();
-});
+it(
+  'caches CORS preflight for a bounded period and keeps it credential-free',
+  async () => {
+    const repository: RoundRepository = {
+      start: async () => {
+        throw new Error('not expected');
+      },
+      get: async () => null,
+      commit: async () => {
+        throw new Error('not expected');
+      },
+    };
+    const handler = createCompetitionHandler(async () => null, repository, () => 0);
+    const response = await handler(
+      new Request('https://example.com/competition', { method: 'OPTIONS' }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Max-Age')).toBe('600');
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(response.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+  },
+);
