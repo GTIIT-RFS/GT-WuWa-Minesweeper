@@ -117,7 +117,7 @@ Deno.serve(
       const { data, error } = await server.auth.getClaims(token);
       const claims = data?.claims;
       const id = typeof claims?.sub === 'string' ? claims.sub : null;
-      return !error && id ? { id, isAnonymous: claims.is_anonymous === true } : null;
+      return !error && id ? { id, isAnonymous: claims?.is_anonymous === true } : null;
     },
     repository,
     () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
