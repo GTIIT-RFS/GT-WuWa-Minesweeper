@@ -35,7 +35,13 @@ export function Board({
           const isPending = pendingMove?.index === i;
           const pendingClass =
             isPending && pendingMove
-              ? `pending-action pending-${pendingMove.kind} ${pendingMove.retry ? 'pending-retry' : ''}`
+              ? [
+                  'pending-action',
+                  `pending-${pendingMove.kind}`,
+                  pendingMove.retry ? 'pending-retry' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')
               : '';
           const pendingSuffix =
             isPending && pendingMove
@@ -43,6 +49,16 @@ export function Board({
                 ? '，待重试'
                 : '，等待服务器确认'
               : '';
+          const cellClass = [
+            'cell',
+            cell.revealed ? 'open' : '',
+            game.hit === i ? 'hit' : '',
+            `n${cell.adjacent}`,
+            wrong ? 'wrong' : '',
+            pendingClass,
+          ]
+            .filter(Boolean)
+            .join(' ');
           const label = cell.revealed
             ? cell.mine
               ? '土豆'
@@ -53,7 +69,7 @@ export function Board({
           return (
             <button
               key={i}
-              className={`cell ${cell.revealed ? 'open' : ''} ${game.hit === i ? 'hit' : ''} n${cell.adjacent} ${wrong ? 'wrong' : ''} ${pendingClass}`}
+              className={cellClass}
               aria-label={`第${row}行第${col}列，${label}${pendingSuffix}`}
               aria-disabled={ended || cell.revealed || isPending}
               onClick={() => (flagMode ? onFlag(i) : onReveal(i))}
