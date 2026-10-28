@@ -2034,7 +2034,6 @@ summary {
   animation: none;
 }
 
-
 /* Visually separate non-prize test operations from the official event. */
 .test-mode-notice {
   border-left: 3px solid var(--mint, #8fe3d4);

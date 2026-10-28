@@ -57,7 +57,9 @@ export function AwardWallet({ testMode = false }: { testMode?: boolean }) {
       <span className="eyebrow">MY REWARDS / 私人领奖页</span>
       <h1>{testMode ? '我的测试领奖凭证' : '我的领奖凭证'}</h1>
       {testMode ? (
-        <p className="test-mode-notice">仅用于验证系统流程，不对应实物奖品。测试凭证、领取记录与正式赛事完全隔离，不占用正式领奖名额。</p>
+        <p className="test-mode-notice">
+          仅用于验证系统流程，不对应实物奖品。测试凭证、领取记录与正式赛事完全隔离，不占用正式领奖名额。
+        </p>
       ) : (
         <>
           <p>

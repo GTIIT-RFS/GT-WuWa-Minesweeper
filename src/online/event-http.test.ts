@@ -18,11 +18,18 @@ function setup() {
   const games: RoundRepository = { start: vi.fn(), get: vi.fn(), commit: vi.fn() };
   const testGames: RoundRepository = {
     start: vi.fn(async (player, name, state) => ({
-      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', player_id: player,
-      competition_id: 'club-night-test-initial', display_name: name, state, revision: 0,
-      started_at: new Date().toISOString(), finished_at: null, last_request_id: null,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      player_id: player,
+      competition_id: 'club-night-test-initial',
+      display_name: name,
+      state,
+      revision: 0,
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      last_request_id: null,
     })),
-    get: vi.fn(), commit: vi.fn(),
+    get: vi.fn(),
+    commit: vi.fn(),
   };
   const handler = createCompetitionHandler(
     async (token) =>
@@ -115,7 +122,6 @@ it('rejects malformed paging and stage IDs before public queries', async () => {
   expect(events.board).not.toHaveBeenCalled();
 });
 
-
 it('keeps test results on a separate public API route and requires identity for test games', async () => {
   const { post, events, testGames } = setup();
   expect((await post({ action: 'test_overview', userId: 'victim' })).status).toBe(200);
@@ -134,7 +140,21 @@ it('restricts test settlement and test claim actions to verified staff accounts'
   expect((await post({ action: 'test_admin_settle', requestId }, 'anonymous')).status).toBe(403);
   expect((await post({ action: 'test_admin_settle', requestId }, 'staff')).status).toBe(200);
   expect(events.testAdminSettle).toHaveBeenCalledWith('verified-staff', requestId);
-  expect((await post({ action: 'test_admin_action', requestId, operation: 'claim', payload: {} }, 'staff')).status).toBe(200);
+  expect(
+    (
+      await post(
+        { action: 'test_admin_action', requestId, operation: 'claim', payload: {} },
+        'staff',
+      )
+    ).status,
+  ).toBe(200);
   expect(events.testAdminAction).toHaveBeenCalledWith('verified-staff', requestId, 'claim', {});
-  expect((await post({ action: 'test_admin_action', requestId, operation: 'configure', payload: {} }, 'staff')).status).toBe(400);
+  expect(
+    (
+      await post(
+        { action: 'test_admin_action', requestId, operation: 'configure', payload: {} },
+        'staff',
+      )
+    ).status,
+  ).toBe(400);
 });

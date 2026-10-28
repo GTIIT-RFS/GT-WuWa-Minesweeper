@@ -78,7 +78,14 @@ export function createCompetitionHandler(
             (typeof input.stageId !== 'string' || !uuid.test(input.stageId)))
         )
           throw new ApiError(400, '无效测试排行榜。');
-        return json(await events.testBoard(input.kind as string, (input.stageId as string) ?? null, player, page as number));
+        return json(
+          await events.testBoard(
+            input.kind as string,
+            (input.stageId as string) ?? null,
+            player,
+            page as number,
+          ),
+        );
       }
       if (input.action === 'overview') {
         if (!events) throw new ApiError(503, '比赛服务尚未升级。');
@@ -104,7 +111,11 @@ export function createCompetitionHandler(
       if (!player) throw new ApiError(401, '匿名身份已失效，请重新连接；不要清除浏览器数据。');
       if (input.action === 'awards' || input.action === 'test_awards') {
         if (!events) throw new ApiError(503, '领奖服务尚未升级。');
-        return json(input.action === 'test_awards' ? await events.testAwards(player) : await events.awards(player));
+        return json(
+          input.action === 'test_awards'
+            ? await events.testAwards(player)
+            : await events.awards(player),
+        );
       }
       if (input.action === 'test_start' || input.action === 'test_move') {
         if (!testRepository) throw new ApiError(503, '在线测试服务尚未升级。');
@@ -118,10 +129,21 @@ export function createCompetitionHandler(
           throw new ApiError(400, '无效管理请求编号。');
         if (input.action === 'test_admin_settle')
           return json(await events.testAdminSettle(player, input.requestId));
-        if (!['claim', 'status', 'rollover'].includes(input.operation as string) ||
-          !input.payload || typeof input.payload !== 'object' || Array.isArray(input.payload))
+        if (
+          !['claim', 'status', 'rollover'].includes(input.operation as string) ||
+          !input.payload ||
+          typeof input.payload !== 'object' ||
+          Array.isArray(input.payload)
+        )
           throw new ApiError(400, '无效测试管理操作。');
-        return json(await events.testAdminAction(player, input.requestId, input.operation as string, input.payload as Record<string, unknown>));
+        return json(
+          await events.testAdminAction(
+            player,
+            input.requestId,
+            input.operation as string,
+            input.payload as Record<string, unknown>,
+          ),
+        );
       }
       if (input.action === 'admin_read' || input.action === 'admin_action') {
         if (identity!.isAnonymous) throw new ApiError(403, '需要工作人员账号。');

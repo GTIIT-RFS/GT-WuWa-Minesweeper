@@ -51,7 +51,11 @@ export const testAdminAction = (
   operation: string,
   payload: Record<string, unknown>,
   requestId: string,
-) => eventRequest<{ ok: boolean; replayed?: boolean }>({ action: 'test_admin_action', operation, payload, requestId }, true);
+) =>
+  eventRequest<{ ok: boolean; replayed?: boolean }>(
+    { action: 'test_admin_action', operation, payload, requestId },
+    true,
+  );
 export const readAdmin = (page = 0) =>
   eventRequest<AdminData>({ action: 'admin_read', page }, true);
 export const adminRequest = (
@@ -72,7 +76,10 @@ export type OnlineRequest =
       requestId: string;
       move: Move;
     };
-export async function competitionRequest(body: OnlineRequest, testMode = false): Promise<PublicRound> {
+export async function competitionRequest(
+  body: OnlineRequest,
+  testMode = false,
+): Promise<PublicRound> {
   if (!testMode) return eventRequest<PublicRound>(body);
   return eventRequest<PublicRound>({
     ...body,

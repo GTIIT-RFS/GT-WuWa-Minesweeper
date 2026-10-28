@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { readOverview, readBoard, readTestOverview, readTestBoard, supabase } from '../online/client';
+import {
+  readOverview,
+  readBoard,
+  readTestOverview,
+  readTestBoard,
+  supabase,
+} from '../online/client';
 import { awardLabels, beijing, countdown } from '../online/presentation';
 import type {
   EventOverview,
@@ -133,29 +139,37 @@ export function OnlineLeaderboard({
   const stage = data?.currentStage;
   const nextStage = data?.stages.find((s) => Date.parse(s.starts_at) > serverMs);
   const deadline = stage?.ends_at ?? nextStage?.starts_at;
-  const labels = testMode ? {
-    unconfigured: '测试场初始化中',
-    upcoming: '测试场准备中',
-    open: '测试场长期开放 · 不计入正式赛',
-    closing: '测试轮次即将结算',
-    paused: '测试场暂停',
-    ended: '测试轮次已结束',
-  } : {
-    unconfigured: '活动日期尚未配置',
-    upcoming: '等待开赛',
-    open: '本轮开放中',
-    closing: '已停止开新局 · 已开始对局可继续',
-    paused: '紧急暂停 · 计时继续',
-    ended: '整晚比赛已结束',
-  };
+  const labels = testMode
+    ? {
+        unconfigured: '测试场初始化中',
+        upcoming: '测试场准备中',
+        open: '测试场长期开放 · 不计入正式赛',
+        closing: '测试轮次即将结算',
+        paused: '测试场暂停',
+        ended: '测试轮次已结束',
+      }
+    : {
+        unconfigured: '活动日期尚未配置',
+        upcoming: '等待开赛',
+        open: '本轮开放中',
+        closing: '已停止开新局 · 已开始对局可继续',
+        paused: '紧急暂停 · 计时继续',
+        ended: '整晚比赛已结束',
+      };
   const currentAwards = data?.awards.filter((a) => a.stage_id === selected) ?? [];
   return (
     <section className={`panel online-leaderboard ${display ? 'projection' : ''}`}>
       <span className="eyebrow">GT WUWA · CLUB NIGHT / 匿名竞速赛</span>
       <div className="event-title-row">
         <div>
-          <h1>{testMode ? '在线测试排行榜' : display ? '土豆扫雷 · 全场排行榜' : '匿名竞速排行榜'}</h1>
-          <p>{testMode ? '8 × 8 · 10 雷 · 180 秒 · 独立测试成绩，不计入正式赛' : '8 × 8 · 10 雷 · 180 秒 · 首格安全 · 每轮独立最佳成绩'}</p>
+          <h1>
+            {testMode ? '在线测试排行榜' : display ? '土豆扫雷 · 全场排行榜' : '匿名竞速排行榜'}
+          </h1>
+          <p>
+            {testMode
+              ? '8 × 8 · 10 雷 · 180 秒 · 独立测试成绩，不计入正式赛'
+              : '8 × 8 · 10 雷 · 180 秒 · 首格安全 · 每轮独立最佳成绩'}
+          </p>
         </div>
         {deadline && !testMode && (
           <div className="stage-countdown">
@@ -172,16 +186,16 @@ export function OnlineLeaderboard({
             <strong>{data ? labels[data.state] : '正在读取服务器赛程…'}</strong>
             {stage && (
               <span>
-                {testMode ? '测试轮次' : `第 ${stage.round_no} 轮`} · 北京时间 {beijing(stage.starts_at, true)}–
-                {beijing(stage.ends_at)}
+                {testMode ? '测试轮次' : `第 ${stage.round_no} 轮`} · 北京时间{' '}
+                {beijing(stage.starts_at, true)}–{beijing(stage.ends_at)}
               </span>
             )}
           </div>
           <div className="event-schedule">
             {data?.stages.map((s) => (
               <span key={s.id} className={s.id === stage?.id ? 'current-stage' : ''}>
-                {testMode ? '测试轮次' : `第${s.round_no}轮`} {beijing(s.starts_at)}–{beijing(s.ends_at)}{' '}
-                {s.settled_at ? '已结算' : ''}
+                {testMode ? '测试轮次' : `第${s.round_no}轮`} {beijing(s.starts_at)}–
+                {beijing(s.ends_at)} {s.settled_at ? '已结算' : ''}
               </span>
             ))}
           </div>
@@ -246,7 +260,13 @@ export function OnlineLeaderboard({
               ))}
             </div>
           )}
-          {!board.entries.length && data && <p>{testMode ? '暂无有效测试成绩。只有测试场服务端确认的通关才能入榜。' : '暂无有效成绩。只有本轮服务端确认的通关才能入榜。'}</p>}
+          {!board.entries.length && data && (
+            <p>
+              {testMode
+                ? '暂无有效测试成绩。只有测试场服务端确认的通关才能入榜。'
+                : '暂无有效成绩。只有本轮服务端确认的通关才能入榜。'}
+            </p>
+          )}
           {board.mine && (
             <p className="personal-rank" role="status">
               你的排名 #{board.mine.rank} · {board.mine.display_name} ·{' '}
@@ -289,7 +309,11 @@ export function OnlineLeaderboard({
             </div>
           )}
           {kind === 'evening' && (
-            <p className="muted">{testMode ? '测试总榜汇总所有测试轮次，不影响正式排名与领奖。' : '整晚总榜只作荣誉展示，各轮礼品以冻结排名和现场核验为准。'}</p>
+            <p className="muted">
+              {testMode
+                ? '测试总榜汇总所有测试轮次，不影响正式排名与领奖。'
+                : '整晚总榜只作荣誉展示，各轮礼品以冻结排名和现场核验为准。'}
+            </p>
           )}
           {data?.state === 'ended' && (
             <div className="public-awards">

@@ -83,7 +83,12 @@ export interface EventRepository {
     payload: Record<string, unknown>,
   ): Promise<unknown>;
   testOverview(player: string | null): Promise<unknown>;
-  testBoard(kind: string, stage: string | null, player: string | null, page: number): Promise<unknown>;
+  testBoard(
+    kind: string,
+    stage: string | null,
+    player: string | null,
+    page: number,
+  ): Promise<unknown>;
   testAwards(player: string): Promise<unknown>;
   testAdminSettle(player: string, request: string): Promise<unknown>;
   testAdminAction(

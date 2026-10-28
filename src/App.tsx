@@ -31,9 +31,21 @@ import { OnlineLeaderboard } from './components/OnlineLeaderboard';
 import { AwardWallet } from './components/AwardWallet';
 import { EventAdmin } from './components/EventAdmin';
 
-type View = 'menu' | 'game' | 'scores' | 'admin' | 'online' | 'online-test' | 'display' | 'awards' | 'test-awards' | 'event-admin';
+type View =
+  | 'menu'
+  | 'game'
+  | 'scores'
+  | 'admin'
+  | 'online'
+  | 'online-test'
+  | 'display'
+  | 'awards'
+  | 'test-awards'
+  | 'event-admin';
 const hashView = (): View =>
-  ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(location.hash.slice(1).split('?')[0])
+  ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(
+    location.hash.slice(1).split('?')[0],
+  )
     ? (location.hash.slice(1).split('?')[0] as View)
     : 'menu';
 export default function App() {
@@ -242,7 +254,9 @@ export default function App() {
     const fragment =
       next === 'event-admin' && location.hash.startsWith('#event-admin?')
         ? location.hash
-        : ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(next)
+        : ['online', 'online-test', 'display', 'awards', 'test-awards', 'event-admin'].includes(
+              next,
+            )
           ? `#${next}`
           : '';
     history.replaceState(null, '', `${location.pathname}${location.search}${fragment}`);
