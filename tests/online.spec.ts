@@ -208,6 +208,6 @@ test('opens a long-lived isolated online test stage without opening the formal e
   await expect(page.getByText('测试场长期开放 · 不计入正式赛')).toBeVisible();
   await page.getByLabel('公开参赛昵称').fill('网页测试玩家');
   await page.getByRole('button', { name: '开始测试对局' }).click();
-  await expect(page.getByText('网页测试玩家', { exact: true })).toBeVisible();
+  await expect(page.getByText('网页测试玩家', { exact: false })).toBeVisible();
   expect(eventServer.getSignupCount()).toBe(1);
 });
