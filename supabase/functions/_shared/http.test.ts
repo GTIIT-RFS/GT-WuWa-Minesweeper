@@ -63,7 +63,10 @@ Deno.test('POST responses include non-sensitive server timing and a request id',
   const response = await handler(
     new Request('https://test/competition', {
       method: 'POST',
-      headers: { authorization: ['Bearer', 'verified-test-token'].join(' '), 'content-type': 'application/json' },
+      headers: {
+        authorization: ['Bearer', 'verified-test-token'].join(' '),
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ action: 'start', name: 'Latency test' }),
     }),
   );
