@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { readAwards, supabase } from '../online/client';
+import { readAwards, readTestAwards, supabase } from '../online/client';
 import type { Award } from '../../supabase/functions/_shared/event-types';
 import { awardLabels } from '../online/presentation';
 import QRCode from 'qrcode';
-function PrivateClaimQr({ award }: { award: Award }) {
+function PrivateClaimQr({ award, testMode }: { award: Award; testMode: boolean }) {
   const [image, setImage] = useState('');
-  const url = `${location.origin}${location.pathname}#event-admin?award=${encodeURIComponent(award.id)}&credential=${encodeURIComponent(award.token!)}`;
+  const url = `${location.origin}${location.pathname}#event-admin?${testMode ? 'test=1&' : ''}award=${encodeURIComponent(award.id)}&credential=${encodeURIComponent(award.token!)}`;
   useEffect(() => {
     let stopped = false;
     void QRCode.toDataURL(url, { width: 220, margin: 2 })
@@ -27,7 +27,7 @@ function PrivateClaimQr({ award }: { award: Award }) {
     />
   ) : null;
 }
-export function AwardWallet() {
+export function AwardWallet({ testMode = false }: { testMode?: boolean }) {
   const [awards, setAwards] = useState<Award[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -36,7 +36,7 @@ export function AwardWallet() {
     let timer: number;
     async function poll() {
       try {
-        const rows = await readAwards();
+        const rows = testMode ? await readTestAwards() : await readAwards();
         if (!stopped) {
           setAwards(rows);
           setError('');
@@ -51,17 +51,23 @@ export function AwardWallet() {
       stopped = true;
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [testMode]);
   return (
     <section className="panel award-wallet">
       <span className="eyebrow">MY REWARDS / 私人领奖页</span>
-      <h1>我的领奖凭证</h1>
-      <p>
-        请在现场向工作人员出示本页及一次性凭证。同一真实参与者整晚原则上最多领取一次；工作人员将现场核验，昵称不作为唯一身份。
-      </p>
-      <p className="muted">
-        请保留当前浏览器，不要退出匿名会话或清除浏览器数据。私人凭证不会显示在公开排行榜。
-      </p>
+      <h1>{testMode ? '我的测试领奖凭证' : '我的领奖凭证'}</h1>
+      {testMode ? (
+        <p className="test-mode-notice">仅用于验证系统流程，不对应实物奖品。测试凭证、领取记录与正式赛事完全隔离，不占用正式领奖名额。</p>
+      ) : (
+        <>
+          <p>
+            请在现场向工作人员出示本页及一次性凭证。同一真实参与者整晚原则上最多领取一次；工作人员将现场核验，昵称不作为唯一身份。
+          </p>
+          <p className="muted">
+            请保留当前浏览器，不要退出匿名会话或清除浏览器数据。私人凭证不会显示在公开排行榜。
+          </p>
+        </>
+      )}
       {error && <p role="alert">{error}</p>}
       {!awards.length && !error && (
         <p role="status">暂无获奖记录。若轮次刚结束，请等待服务端结算后自动刷新。</p>
@@ -79,7 +85,7 @@ export function AwardWallet() {
             <>
               <p>现场核验凭证（仅向工作人员出示）</p>
               <code className="claim-token">{a.token}</code>
-              <PrivateClaimQr award={a} />
+              <PrivateClaimQr award={a} testMode={testMode} />
               <p className="muted">
                 工作人员可用手机扫描此私人二维码进入核验后台。请勿分享或公开投影。
               </p>
@@ -87,7 +93,7 @@ export function AwardWallet() {
           )}
         </article>
       ))}
-      <a href="#online">返回参赛页面</a>
+      <a href={testMode ? '#online-test' : '#online'}>{testMode ? '返回测试场' : '返回参赛页面'}</a>
     </section>
   );
 }
