@@ -22,61 +22,65 @@ const dbError = (error: { code?: string } | null) => {
   if (error.code === '23505') throw new ApiError(409, '已有记录，请刷新查看。');
   throw new ApiError(503, '排行榜服务暂时不可用，请重试。');
 };
+const timedRpc = async (name: string, args: Record<string, unknown>) => {
+  const started = performance.now();
+  const result = await server.rpc(name, args);
+  console.info(
+    JSON.stringify({
+      event: 'competition_rpc',
+      rpc: name,
+      duration_ms: Math.round((performance.now() - started) * 100) / 100,
+      ok: !result.error,
+      code: result.error?.code ?? null,
+    }),
+  );
+  dbError(result.error);
+  return result.data;
+};
 const repository: RoundRepository = {
   async start(player, name, state) {
-    const { data, error } = await server.rpc('start_online_round', {
+    return (await timedRpc('start_online_round', {
       p_player: player,
       p_name: name,
       p_state: state,
-    });
-    dbError(error);
-    return data as Round;
+    })) as Round;
   },
   async get(id, player) {
-    const { data, error } = await server.rpc('event_get_round', { p_round: id, p_player: player });
-    dbError(error);
-    return data as Round | null;
+    return (await timedRpc('event_get_round', {
+      p_round: id,
+      p_player: player,
+    })) as Round | null;
   },
   async commit(round, state, requestId) {
-    const { data, error } = await server.rpc('commit_online_move', {
+    return (await timedRpc('commit_online_move', {
       p_round: round.id,
       p_player: round.player_id,
       p_revision: round.revision,
       p_state: state,
       p_request: requestId,
-    });
-    dbError(error);
-    return data as Round;
+    })) as Round;
   },
 };
-async function call(name: string, args: Record<string, unknown>) {
-  const { data, error } = await server.rpc(name, args);
-  dbError(error);
-  return data;
-}
 const testRepository: RoundRepository = {
   async start(player, name, state) {
-    const { data, error } = await server.rpc('event_test_start', {
+    return (await timedRpc('event_test_start', {
       p_player: player,
       p_name: name,
       p_state: state,
-    });
-    dbError(error);
-    return data as Round;
+    })) as Round;
   },
   get: repository.get,
   async commit(round, state, requestId) {
-    const { data, error } = await server.rpc('event_test_commit', {
+    return (await timedRpc('event_test_commit', {
       p_round: round.id,
       p_player: round.player_id,
       p_revision: round.revision,
       p_state: state,
       p_request: requestId,
-    });
-    dbError(error);
-    return data as Round;
+    })) as Round;
   },
 };
+const call = (name: string, args: Record<string, unknown>) => timedRpc(name, args);
 const events: EventRepository = {
   overview: (player) => call('event_overview', { p_player: player }),
   board: (kind, stage, player, page) =>
@@ -107,12 +111,13 @@ const events: EventRepository = {
 Deno.serve(
   createCompetitionHandler(
     async (token) => {
-      // Do not authorize with decoded JWT contents or editable user_metadata.
-      const {
-        data: { user },
-        error,
-      } = await server.auth.getUser(token);
-      return !error && user ? { id: user.id, isAnonymous: user.is_anonymous === true } : null;
+      // getClaims verifies JWT signatures and uses cached JWKS for asymmetric signing keys.
+      // Supabase JS falls back to getUser for legacy symmetric JWT signing keys.
+      // Never authorize with decoded, unverified claims or editable user_metadata.
+      const { data, error } = await server.auth.getClaims(token);
+      const claims = data?.claims;
+      const id = typeof claims?.sub === 'string' ? claims.sub : null;
+      return !error && id ? { id, isAnonymous: claims?.is_anonymous === true } : null;
     },
     repository,
     () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
