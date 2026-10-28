@@ -68,8 +68,7 @@ export async function createEventServer(page: Page) {
     adminAction: (player, request, action, payload) =>
       rpc('event_admin_action', [player, request, action, payload]),
     testOverview: (player) => rpc('event_test_overview', [player]),
-    testBoard: (kind, stage, player, page) =>
-      rpc('event_test_board', [kind, stage, player, page]),
+    testBoard: (kind, stage, player, page) => rpc('event_test_board', [kind, stage, player, page]),
     testAwards: (player) => rpc('event_test_awards', [player]),
     testAdminSettle: (player, request) => rpc('event_test_admin_settle', [player, request]),
     testAdminAction: (player, request, action, payload) =>

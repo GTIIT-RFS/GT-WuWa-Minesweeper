@@ -198,7 +198,6 @@ test('a non-admin permanent account cannot access the management controls', asyn
   await expect(page.getByRole('button', { name: '紧急暂停比赛' })).toHaveCount(0);
 });
 
-
 it('opens a long-lived isolated online test stage without opening the formal event', async ({
   page,
   eventServer,
