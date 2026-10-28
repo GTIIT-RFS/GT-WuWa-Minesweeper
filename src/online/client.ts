@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { PublicRound, Move } from '../../supabase/functions/_shared/competition';
 import { isPublicKey } from './config';
+import type {
+  EventOverview,
+  EventBoard,
+  Award,
+  AdminData,
+} from '../../supabase/functions/_shared/event-types';
 
 const url = import.meta.env.VITE_SUPABASE_URL?.trim();
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
@@ -10,32 +16,39 @@ export const supabase =
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
       })
     : null;
+// Staff sign-in must not overwrite a participant's anonymous identity in this browser.
+export const staffSupabase =
+  url && /^https:\/\//.test(url) && isPublicKey(key)
+    ? createClient(url, key!, {
+        auth: {
+          storageKey: 'gt-wuwa:staff-session:v1',
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+      })
+    : null;
 export interface OnlineScore {
   player_id: string;
   display_name: string;
   elapsed_ms: number;
   achieved_at: string;
 }
-export async function readLeaderboard(): Promise<OnlineScore[]> {
-  if (!supabase) throw new Error('在线排行榜尚未配置。');
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 15_000);
-  try {
-    const { data, error } = await supabase
-      .from('online_best_scores')
-      .select('player_id,display_name,elapsed_ms,achieved_at')
-      .eq('competition_id', 'club-night-v1')
-      .order('elapsed_ms')
-      .order('achieved_at')
-      .order('player_id')
-      .limit(100)
-      .abortSignal(controller.signal);
-    if (error) throw new Error('暂时无法刷新排行榜，请稍后重试。');
-    return data;
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
+export const readOverview = () => eventRequest<EventOverview>({ action: 'overview' });
+export const readBoard = (kind: string, stageId: string | null, page = 0) =>
+  eventRequest<EventBoard>({ action: 'board', kind, stageId, page });
+export const readAwards = () => eventRequest<Award[]>({ action: 'awards' });
+export const readAdmin = (page = 0) =>
+  eventRequest<AdminData>({ action: 'admin_read', page }, true);
+export const adminRequest = (
+  operation: string,
+  payload: Record<string, unknown>,
+  requestId: string,
+) =>
+  eventRequest<{ ok: boolean; replayed?: boolean }>(
+    { action: 'admin_action', operation, payload, requestId },
+    true,
+  );
 export type OnlineRequest =
   | { action: 'start'; name: string }
   | {
@@ -46,8 +59,12 @@ export type OnlineRequest =
       move: Move;
     };
 export async function competitionRequest(body: OnlineRequest): Promise<PublicRound> {
-  if (!supabase) throw new Error('在线比赛尚未配置。');
-  const { data, error } = await supabase.functions.invoke('competition', { body, timeout: 15_000 });
+  return eventRequest<PublicRound>(body);
+}
+export async function eventRequest<T>(body: object, staff = false): Promise<T> {
+  const client = staff ? staffSupabase : supabase;
+  if (!client) throw new Error('在线比赛尚未配置。');
+  const { data, error } = await client.functions.invoke('competition', { body, timeout: 15_000 });
   if (error) {
     let message = '网络请求失败，请重试同一操作；服务器会防止重复计分。';
     if (error.context instanceof Response) {
@@ -56,5 +73,5 @@ export async function competitionRequest(body: OnlineRequest): Promise<PublicRou
     }
     throw new Error(message);
   }
-  return data as PublicRound;
+  return data as T;
 }

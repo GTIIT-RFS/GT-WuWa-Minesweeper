@@ -6,6 +6,10 @@ import type { Settings } from '../storage/settings';
 import type { SoundKey } from '../storage/assets';
 import { Board } from './Board';
 import { OnlineLeaderboard } from './OnlineLeaderboard';
+import { ensureAnonymousSession } from '../online/identity';
+import { captchaConfigured, Turnstile } from './Turnstile';
+import { displayName } from '../../supabase/functions/_shared/competition';
+import type { EventOverview } from '../../supabase/functions/_shared/event-types';
 
 export function OnlineCompetition({
   settings,
@@ -19,10 +23,10 @@ export function OnlineCompetition({
   onExplosion: () => void;
 }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [sent, setSent] = useState(false);
   const [name, setName] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const [overview, setOverview] = useState<EventOverview | null>(null);
   const [round, setRound] = useState<PublicRound | null>(null);
   const [pending, setPending] = useState<OnlineRequest | null>(null);
   const busy = useRef(false);
@@ -44,28 +48,6 @@ export function OnlineCompetition({
     });
     return () => subscription.unsubscribe();
   }, []);
-  async function auth(verify: boolean) {
-    if (!supabase || busy.current) return;
-    busy.current = true;
-    setWorking(true);
-    setError('');
-    try {
-      const { error } = verify
-        ? await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' })
-        : await supabase.auth.signInWithOtp({ email: email.trim() });
-      if (error) throw error;
-      if (!verify) setSent(true);
-    } catch {
-      setError(
-        verify
-          ? '验证码无效或已过期，请检查后重试。'
-          : '验证码发送失败，请稍后重试并检查邮箱设置。',
-      );
-    } finally {
-      busy.current = false;
-      setWorking(false);
-    }
-  }
   async function send(body: OnlineRequest) {
     if (busy.current) return;
     busy.current = true;
@@ -73,12 +55,19 @@ export function OnlineCompetition({
     setError('');
     setPending(body);
     try {
+      if (body.action === 'start') {
+        displayName(body.name);
+        const restored = await ensureAnonymousSession(captchaToken || undefined);
+        setSession(restored);
+      }
       const next = await competitionRequest(body);
       const previous = round?.game.status;
       receivedAt.current = performance.now();
       setElapsed(next.elapsedMs);
       setRound(next);
       setPending(null);
+      if (['won', 'lost', 'timeout'].includes(next.game.status))
+        window.dispatchEvent(new Event('gt-wuwa:results-updated'));
       if (next.game.status === 'lost' && previous !== 'lost') {
         sound('warning');
         onExplosion();
@@ -88,6 +77,8 @@ export function OnlineCompetition({
         sound(body.move.kind === 'flag' ? 'flag' : 'reveal');
     } catch (e) {
       setError((e as Error).message);
+      setCaptchaToken('');
+      setCaptchaReset((x) => x + 1);
     } finally {
       busy.current = false;
       setWorking(false);
@@ -127,65 +118,19 @@ export function OnlineCompetition({
         <span className="eyebrow">SHARED CHALLENGE / 在线比赛</span>
         <h1>一起排雷，全场竞速。</h1>
         <p>8 × 8 · 10 雷 · 180 秒。服务器发出对局即开始计时，包含网络往返时间。允许多次挑战。</p>
-        <p className="muted">同一邮箱在手机和电脑上共用最佳成绩。昵称会公开展示，邮箱不会上榜。</p>
+        <p className="muted">
+          输入昵称即可匿名参赛，无需邮箱、手机号或密码。清除浏览器数据或更换设备可能丢失匿名身份；请保留当前浏览器领奖。
+        </p>
         <a href="#display" target="_blank" rel="noreferrer">
           打开投影大屏 ↗
         </a>
         {!supabase ? (
           <p role="status">在线服务尚未配置。请继续使用扫雷终端的本地模式。</p>
-        ) : !session ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void auth(sent);
-            }}
-          >
-            <label>
-              参赛邮箱
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                disabled={sent || working}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            {sent && (
-              <label>
-                邮箱验证码
-                <input
-                  required
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </label>
-            )}
-            <button className="primary" disabled={working}>
-              {sent ? '验证并登录' : '发送邮箱验证码'}
-            </button>
-            {sent && (
-              <button
-                type="button"
-                disabled={working}
-                onClick={() => {
-                  setSent(false);
-                  setCode('');
-                }}
-              >
-                重新发送 / 更换邮箱
-              </button>
-            )}
-          </form>
         ) : (
           <>
             <div className="online-toolbar">
-              <span>已登录 · {session.user.email}</span>
-              <button disabled={working} onClick={() => void supabase!.auth.signOut()}>
-                退出账号
-              </button>
+              <span>{session ? '匿名会话已恢复' : '尚未建立匿名会话'}</span>
+              <a href="#awards">我的领奖凭证</a>
             </div>
             {!active && !pending && (
               <form
@@ -199,18 +144,30 @@ export function OnlineCompetition({
                   公开参赛昵称
                   <input
                     required
-                    maxLength={16}
+                    maxLength={32}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                 </label>
-                <button className="primary" disabled={working}>
-                  开始在线挑战
+                {!session && <Turnstile key={captchaReset} onToken={setCaptchaToken} />}
+                <button
+                  className="primary"
+                  disabled={
+                    working ||
+                    (!session && captchaConfigured && !captchaToken) ||
+                    !overview ||
+                    !['open', 'closing'].includes(overview.state)
+                  }
+                >
+                  {overview?.state === 'closing' ? '恢复当前对局' : '开始在线挑战'}
                 </button>
               </form>
             )}
             {!round && !pending && (
-              <p className="muted">中途离开后，输入昵称并开始可恢复尚未超时的对局。</p>
+              <p className="muted">
+                刷新后输入昵称可恢复当前浏览器的未超时对局。每轮结束前 3
+                分钟停止开新局。领奖以现场核验为准，匿名账号不能证明真实个人唯一。
+              </p>
             )}
             {round && (
               <>
@@ -283,7 +240,7 @@ export function OnlineCompetition({
           </div>
         )}
       </section>
-      <OnlineLeaderboard />
+      <OnlineLeaderboard onOverview={setOverview} />
     </div>
   );
 }
