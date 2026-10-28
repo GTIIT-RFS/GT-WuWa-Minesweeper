@@ -32,12 +32,18 @@ it('adds a partial index for active-round lookup without indexing completed roun
 
 it('caches CORS preflight for a bounded period and keeps it credential-free', async () => {
   const repository: RoundRepository = {
-    start: async () => { throw new Error('not expected'); },
+    start: async () => {
+      throw new Error('not expected');
+    },
     get: async () => null,
-    commit: async () => { throw new Error('not expected'); },
+    commit: async () => {
+      throw new Error('not expected');
+    },
   };
   const handler = createCompetitionHandler(async () => null, repository, () => 0);
-  const response = await handler(new Request('https://example.com/competition', { method: 'OPTIONS' }));
+  const response = await handler(
+    new Request('https://example.com/competition', { method: 'OPTIONS' }),
+  );
   expect(response.status).toBe(200);
   expect(response.headers.get('Access-Control-Max-Age')).toBe('600');
   expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');

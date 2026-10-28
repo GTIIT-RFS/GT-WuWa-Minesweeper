@@ -46,7 +46,10 @@ const repository: RoundRepository = {
     })) as Round;
   },
   async get(id, player) {
-    return (await timedRpc('event_get_round', { p_round: id, p_player: player })) as Round | null;
+    return (await timedRpc('event_get_round', {
+      p_round: id,
+      p_player: player,
+    })) as Round | null;
   },
   async commit(round, state, requestId) {
     return (await timedRpc('commit_online_move', {
@@ -114,9 +117,7 @@ Deno.serve(
       const { data, error } = await server.auth.getClaims(token);
       const claims = data?.claims;
       const id = typeof claims?.sub === 'string' ? claims.sub : null;
-      return !error && id
-        ? { id, isAnonymous: claims.is_anonymous === true }
-        : null;
+      return !error && id ? { id, isAnonymous: claims.is_anonymous === true } : null;
     },
     repository,
     () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32,
